@@ -32,12 +32,15 @@ import pickle
 import sys
 import argparse
 import time
+import os
 import os.path
 
 from get_stat_probs import get_stat_probs as gsp_get_stat_probs
 from get_stat_probs import get_waveform_list as gsp_get_waveform_list
 from get_stat_probs import make_references as gsp_make_references
-from get_stat_probs import  kt ### this is kendalltau
+from get_stat_probs import kt
+
+_REF_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'ref_files')
 
 
 
@@ -211,6 +214,9 @@ def main(args):
 
     n_workers = args.workers
     pool_size = n_workers if n_workers > 0 else None
+    actual_workers = pool_size or multiprocessing.cpu_count()
+    print(f'Processing {len(gene_ids)} gene(s) with {actual_workers if n_workers != 1 else 1} worker(s)...')
+    t0 = time.time()
     if n_workers == 1:
         _init_worker(triples, dref, new_header)
         results = [_process_gene(a) for a in gene_args]
@@ -218,6 +224,7 @@ def main(args):
         with multiprocessing.Pool(pool_size, initializer=_init_worker,
                                    initargs=(triples, dref, new_header)) as pool:
             results = pool.map(_process_gene, gene_args)
+    print(f'Done in {time.time() - t0:.1f}s')
 
     for result in results:
         if result is None:
@@ -624,181 +631,167 @@ def dict_order_probs(ms,sds,ns,size=100):
 
 def __create_parser__():
     p = argparse.ArgumentParser(
-        description="Python script for running empirical JTK_CYCLE with asymmetry search as described in Hutchison, Maienschein-Cline, and Chiang et al. Improved statistical methods enable greater sensitivity in rhythm detection for genome-wide data, PLoS Computational Biology 2015 11(3): e1004094. This script was written by Alan L. Hutchison, alanlhutchison@uchicago.edu, Aaron R. Dinner Group, University of Chicago.",
-        epilog="Please contact the correpsonding author if you have any questions.",
-        )
+        description="Bootstrap empirical JTK_CYCLE (eJTK) for circadian rhythm detection. "
+                    "See Hutchison et al. PLoS Comput Biol 2015 11(3):e1004094.",
+        epilog="Either -f (raw data) or -k (pre-computed pickle) must be supplied.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     p.add_argument('--version', '-V', action='version', version='%(prog)s ' + VERSION)
 
-                   
-    #p.add_argument("-t", "--test",
-    #               action='store_true',
-    #               default=False,
-    #               help="run the Python unittest testing suite")
     p.add_argument("-o", "--output",
                    dest="output",
                    action='store',
-                   metavar="filename string",
+                   metavar="FILE",
                    type=str,
-                   default = "DEFAULT",
-                   help="You want to output something. If you leave this blank, _jtkout.txt will be appended to your filename")
+                   default="DEFAULT",
+                   help="Output filename. Defaults to the input filename with a run-specific suffix.")
 
-    p.add_argument("-k","--pickle",
-                          dest="pickle",
-                          metavar="filename string",
-                          type=str,
-                          action='store',
-                          default="DEFAULT",
-                          help='Should be a file with phases you wish to search for listed in a single column separated by newlines.\
-                          Provided file is "period_24.txt"')
+    p.add_argument("-k", "--pickle",
+                   dest="pickle",
+                   metavar="FILE",
+                   type=str,
+                   action='store',
+                   default="DEFAULT",
+                   help="Path to a pre-computed bootstrap pickle file. "
+                        "Skips bootstrap generation when provided.")
 
+    p.add_argument("-l", "--list",
+                   dest="id_list",
+                   metavar="FILE",
+                   type=str,
+                   action='store',
+                   default="DEFAULT",
+                   help="File of gene/series IDs to analyse (one per line). "
+                        "Analyses all IDs if omitted.")
 
-    p.add_argument("-l","--list",
-                          dest="id_list",
-                          metavar="filename string",
-                          type=str,
-                          action='store',
-                          default="DEFAULT",
-                          help='A filename of the ids to be run in this time series. If time is running out on your job, this will be compared to the ids that have already been completed and a file will be created stating what ids remain to be analyzed.')
+    p.add_argument("-n", "--null",
+                   dest="null_list",
+                   metavar="FILE",
+                   type=str,
+                   action='store',
+                   default="DEFAULT",
+                   help="File of non-cycling gene IDs used to estimate variance for eBayes shrinkage. "
+                        "Ignored when -k is used.")
 
-
-    p.add_argument("-n","--null",
-                          dest="null_list",
-                          metavar="filename string",
-                          type=str,
-                          action='store',
-                          default="DEFAULT",
-                          help='A filename of the ids upon which to calculate the standard deviation. These ids are non-cycling, so the standard deviation can be taken across the entire time series. Using this argument is useless if the bootstraps have already been performed.')
-    
-
-    analysis = p.add_argument_group(title="JTK_CYCLE analysis options")
+    analysis = p.add_argument_group(title="Analysis options")
 
     analysis.add_argument("-f", "--filename",
-                   dest="filename",
-                   action='store',
-                   metavar="filename string",
-                    default='DEFAULT',                          
-                   type=str,
-                   help='This is the filename of the data series you wish to analyze.\
-                   The data should be tab-spaced. The first row should contain a # sign followed by the time points with either CT or ZT preceding the time point (such as ZT0 or ZT4). Longer or shorter prefixes will not work. The following rows should contain the gene/series ID followed by the values for every time point. Where values are not available NA should be put in it\'s place.')
+                          dest="filename",
+                          action='store',
+                          metavar="FILE",
+                          default='DEFAULT',
+                          type=str,
+                          help="Tab-delimited input file. Header row must start with # or ID "
+                               "followed by timepoints in ZTn or CTn format. "
+                               "Use NA for missing values.")
 
     analysis.add_argument("-F", "--means",
-                   dest="means",
-                   action='store',
-                   metavar="filename string",
-                    default='DEFAULT',                          
-                   type=str,
-                   help='This is the filename of the time point means of the data series you wish to analyze. The data should be tab-spaced. The first row should contain a # sign followed by the time points with either CT or ZT preceding the time point (such as ZT0 or ZT4). Longer or shorter prefixes will not work. The following rows should contain the gene/series ID followed by the values for every time point. Where values are not available NA should be put in it\'s place.')
+                          dest="means",
+                          action='store',
+                          metavar="FILE",
+                          default='DEFAULT',
+                          type=str,
+                          help="Pre-computed timepoint means file (Limma/no-reps input). "
+                               "Same format as -f.")
 
     analysis.add_argument("-S", "--sds",
-                   dest="sds",
-                   action='store',
-                   metavar="filename string",
-                    default='DEFAULT',                          
-                   type=str,
-                   help='This is the filename of the time point standard devations of the data series you wish to analyze. The data should be tab-spaced. The first row should contain a # sign followed by the time points with either CT or ZT preceding the time point (such as ZT0 or ZT4). Longer or shorter prefixes will not work. The following rows should contain the gene/series ID followed by the values for every time point. Where values are not available NA should be put in it\'s place.')
+                          dest="sds",
+                          action='store',
+                          metavar="FILE",
+                          default='DEFAULT',
+                          type=str,
+                          help="Pre-computed timepoint standard deviations file (Limma/no-reps input).")
 
     analysis.add_argument("-N", "--ns",
-                   dest="ns",
-                   action='store',
-                   metavar="filename string",
-                    default='DEFAULT',
-                   type=str,
-                   help='This is the filename of the time point replicate numbers of the data series you wish to analyze. \
-                   The data should be tab-spaced. The first row should contain a # sign followed by the time points with either CT or ZT preceding the time point (such as ZT0 or ZT4). Longer or shorter prefixes will not work. The following rows should contain the gene/series ID followed by the values for every time point. Where values are not available NA should be put in it\'s place.')
+                          dest="ns",
+                          action='store',
+                          metavar="FILE",
+                          default='DEFAULT',
+                          type=str,
+                          help="Pre-computed timepoint replicate-count file (Limma/no-reps input).")
 
     analysis.add_argument("-W", "--write",
-                   dest="write",
-                   action='store_true',
-                   metavar="Boolean",
-                    default=False,
-                          help='If you want pickle output from BooteJTK, use this flag.')
+                          dest="write",
+                          action='store_true',
+                          default=False,
+                          help="Write bootstrap order-probability dictionaries to a pickle file.")
 
-    
-    
-
-    analysis.add_argument('-x',"--prefix",
+    analysis.add_argument('-x', "--prefix",
                           dest="prefix",
                           type=str,
-                          metavar="string",
+                          metavar="STR",
                           action='store',
                           default="",
-                          help="string to be inserted in the output filename for this run")
+                          help="Label inserted into all output filenames for this run.")
 
-
-    analysis.add_argument('-r',"--reps",
+    analysis.add_argument('-r', "--reps",
                           dest="reps",
                           type=int,
-                          metavar="int",
+                          metavar="N",
                           action='store',
                           default=2,
-                          help="# of reps of each time point to bootstrap (1 or 2, generally)")
+                          help="Replicates per timepoint to bootstrap.")
 
-    analysis.add_argument('-z',"--size",
+    analysis.add_argument('-z', "--size",
                           dest="size",
                           type=int,
-                          metavar="int",
+                          metavar="N",
                           action='store',
                           default=50,
-                          help="Number of bootstraps to be performed")
+                          help="Number of bootstrap resamples per gene.")
 
     analysis.add_argument('-j', '--workers',
                           dest='workers',
                           type=int,
-                          metavar='int',
+                          metavar='N',
                           action='store',
                           default=1,
-                          help='Number of parallel worker processes. 0 = use all available CPUs (default: 1)')
-    
+                          help='Parallel worker processes. 0 = all available CPUs.')
 
-    analysis.add_argument('-w',"--waveform",
+    analysis.add_argument('-w', "--waveform",
                           dest="waveform",
                           type=str,
-                          metavar="filename string",
+                          metavar="STR",
                           action='store',
                           default="cosine",
-                          #choices=["waveform_cosine.txt","waveform_rampup.txt","waveform_rampdown.txt","waveform_step.txt","waveform_impulse.txt","waveform_trough.txt"],
-                          help='Should be a file with waveforms  you wish to search for listed in a single column separated by newlines.\
-                          Options include cosine (dflt), trough')
+                          choices=["cosine", "trough", "impulse", "step"],
+                          help="Reference waveform shape to match against.")
 
     analysis.add_argument("--width", "-a", "--asymmetry",
                           dest="width",
                           type=str,
-                          metavar="filename string",
+                          metavar="FILE",
                           action='store',
-                          default="widths_02-22.txt",
-                          #choices=["widths_02-22.txt","widths_04-20_by4.txt","widths_04-12-20.txt","widths_08-16.txt","width_12.txt"]
-                          help='Should be a file with asymmetries (widths) you wish to search for listed in a single column separated by newlines.\
-                          Provided files include files like "widths_02-22.txt","widths_04-20_by4.txt","widths_04-12-20.txt","widths_08-16.txt","width_12.txt"\nasymmetries=widths')
+                          default=os.path.join(_REF_DIR, 'asymmetries_02-22_by2.txt'),
+                          help="File listing asymmetry (width) values to search, one per line.")
+
     analysis.add_argument('-s', "-ph", "--phase",
                           dest="phase",
-                          metavar="filename string",
+                          metavar="FILE",
                           type=str,
-                          default="phases_00-22_by2.txt",
-                          help='Should be a file with phases you wish to search for listed in a single column separated by newlines.\
-                          Example files include "phases_00-22_by2.txt" or "phases_00-22_by4.txt" or "phases_00-20_by4.txt"')
+                          default=os.path.join(_REF_DIR, 'phases_00-22_by2.txt'),
+                          help="File listing phases to search (hours), one per line.")
 
-    analysis.add_argument("-p","--period",
+    analysis.add_argument("-p", "--period",
                           dest="period",
-                          metavar="filename string",
+                          metavar="FILE",
                           type=str,
                           action='store',
-                          default="period_24.txt",
-                          help='Should be a file with phases you wish to search for listed in a single column separated by newlines.\
-                          Provided file is "period_24.txt"')
-
+                          default=os.path.join(_REF_DIR, 'period24.txt'),
+                          help="File listing period(s) to search (hours), one per line.")
 
     distribution = analysis.add_mutually_exclusive_group(required=False)
     distribution.add_argument("-e", "--exact",
-                              dest="harding",
-                              action='store_true',
-                              default=False,
-                              help="use Harding's exact null distribution (dflt)")
-    distribution.add_argument("-g", "--gaussian","--normal",
-                              dest="normal",
-                              action='store_true',
-                              default=False,
-                              help="use normal approximation to null distribution")
-    
+                               dest="harding",
+                               action='store_true',
+                               default=False,
+                               help="Use Harding's exact null distribution.")
+    distribution.add_argument("-g", "--gaussian", "--normal",
+                               dest="normal",
+                               action='store_true',
+                               default=False,
+                               help="Use normal approximation to null distribution.")
+
     return p
 
 
