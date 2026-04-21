@@ -92,7 +92,7 @@ def main(args):
     #elif fn.split('/')[-1]!='DEFAULT':
     ### WE HAVE CHANGED HOW THE DATA GETS PUT IN
 
-    print 'Going to read in data now'
+    print('Going to read in data now')
     """ Read in the data """
     header,data = read_in(fn)
     d_series = dict_data(data)
@@ -105,7 +105,7 @@ def main(args):
     waveform = 'cosine'
     
     if fn_means.split('/')[-1]!='DEFAULT' and fn_sds.split('/')[-1]!='DEFAULT' and fn_ns.split('/')[-1]!='DEFAULT':
-        print 'Taking Limma/noreps input'
+        print('Taking Limma/noreps input')
         header2,means = read_in(fn_means)
         _,sds = read_in(fn_sds)
         _,ns = read_in(fn_ns)
@@ -116,7 +116,7 @@ def main(args):
         #new_header = list(new_header)*reps
     
         if 'premade' not in opt:
-            print 'Running internal eBayes'
+            print('Running internal eBayes')
             D_null = get_series_data(d_data_master,null_list) if null_list!=[] else {}
             d_data_master = eBayes(d_data_master,D_null)
         elif 'premade' in opt:
@@ -126,7 +126,7 @@ def main(args):
     def add_on_out(outfile):
         add_on = 1
         while os.path.isfile(outfile):
-            print outfile, "already exists, take evasive action!!!"
+            print(outfile, "already exists, take evasive action!!!")
             if '.txt' in outfile:
                 end = '.txt'
             elif '.pkl' in outfile:
@@ -187,11 +187,11 @@ def main(args):
             ### Need to make this file if it doesn't exist already
             if 'premade' not in opt:
                 d_data_sub = {geneID:d_data_master[geneID]}
-                d_data_master1 = dict(d_data_master1.items()+d_data_sub.items())
+                d_data_master1 = {**d_data_master1, **d_data_sub}
                 #print 'd_data_sub[0] is', d_data_sub[d_data_sub.keys()[0]]
                 d_order_probs,d_boots = get_order_prob(d_data_sub,size)
-                d_order_probs_master = dict(d_order_probs_master.items()+d_order_probs.items())
-                d_boots_master = dict(d_boots_master.items()+d_boots.items())
+                d_order_probs_master = {**d_order_probs_master, **d_order_probs}
+                d_boots_master = {**d_boots_master, **d_boots}
                 
             if geneID in d_order_probs:
                 out1,out2,d_taugene,d_pergene,d_phgene,d_nagene = gsp_get_stat_probs(d_order_probs[geneID],new_header,triples,dref,size)
@@ -201,8 +201,8 @@ def main(args):
 
                 done.append(geneID)
 
-                d_tau = dict(d_tau.items()+{geneID:d_taugene}.items())
-                d_ph = dict(d_ph.items()+{geneID:d_phgene}.items())
+                d_tau = {**d_tau, geneID: d_taugene}
+                d_ph = {**d_ph, geneID: d_phgene}
 
         
         if len(remaining)>0:
@@ -219,7 +219,7 @@ def main(args):
         pickle.dump([d_tau,d_ph],open(fn_out_pkl_vars,'wb'))                    
         pickle.dump([d_data_master1,d_order_probs_master,d_boots_master],open(fn_out_pkl,'wb'))
     else:
-        print 'Not writing out pickle results'
+        print('Not writing out pickle results')
 
     taus = [[i,float(out[-2])] for i,out in enumerate(out_lines)]
     taus = sorted(taus,key=lambda x: np.abs(x[1]),reverse=True)
@@ -301,7 +301,7 @@ def read_in(fn):
                 header = words[1:]
             else:
                 if start_right == 0:
-                    print "Please enter file with header starting with # or ID"
+                    print("Please enter file with header starting with # or ID")
                     exit
                 elif start_right == 1:
                     data.append(words)
@@ -498,10 +498,10 @@ def get_series_data(d_data_master,id_list):
             #print key,datase
             N = np.sum(dataset[2])
             length = len(dataset[0])
-            one = 1./N*np.sum([dataset[2][i]*(dataset[1][i]**2+dataset[0][i]**2) for i in xrange(length)])
-            two = (1./N * np.sum([dataset[2][i]*dataset[0][i] for i in xrange(length)]))**2
+            one = 1./N*np.sum([dataset[2][i]*(dataset[1][i]**2+dataset[0][i]**2) for i in range(length)])
+            two = (1./N * np.sum([dataset[2][i]*dataset[0][i] for i in range(length)]))**2
             std = np.sqrt(one+two)
-            m = 1./N *np.sum([dataset[2][i]*dataset[0][i] for i in xrange(length)])
+            m = 1./N *np.sum([dataset[2][i]*dataset[0][i] for i in range(length)])
             d_data[key] = [m,std,N]
     return d_data
 
@@ -554,8 +554,8 @@ def eBayes(d_data,D_null={}):
     d0,s0=get_d0_s0(d_data,D_null)
     
     for key in d_data:
-        d_data[key][1]=[posterior_s(d0,s0,d_data[key][1][i],d_data[key][2][i]) for i in xrange(len(d_data[key][1]))  ]
-        d_data[key][2]=[1 for i in xrange(len(d_data[key][1]))  ]
+        d_data[key][1]=[posterior_s(d0,s0,d_data[key][1][i],d_data[key][2][i]) for i in range(len(d_data[key][1]))]
+        d_data[key][2]=[1 for i in range(len(d_data[key][1]))]
     #print d0,s0
     return d_data
 
@@ -593,7 +593,7 @@ def dict_order_probs(ms,sds,ns,size=100):
     s3 = np.zeros((size,len(sds)))
     """ Fill array time point by time point """
     #print ms,sds
-    for i in xrange(len(sds)):
+    for i in range(len(sds)):
         s3[:,i] = np.random.normal(ms[i],sds[i],size=size)
 
     """ Turn into ranks for storage """

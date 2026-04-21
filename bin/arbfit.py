@@ -71,7 +71,7 @@ def poly(x,p,n):
         try:
             y+=np.power(x,i)*p[i]
         except FloatingPointError:
-            print y
+            print(y)
     return y
 
 def ipoly(x,p,n):
@@ -204,9 +204,9 @@ def fit(typ='line',x=None, y=None, yerr=None,p0=None):
     elif 'poly' in typ:
         n = int(typ[4:])
         typ = 'poly'
-    if x==None: x = np.arange(len(y))
-    if yerr==None: yerr = np.ones(len(y))
-    if p0 == None: 
+    if x is None: x = np.arange(len(y))
+    if yerr is None: yerr = np.ones(len(y))
+    if p0 is None:
         if typ == 'line':    p0 = [1,0]
         elif typ == 'line0': p0 = [1]
         elif typ == 'sine':  p0 = [1,1,0,0]
@@ -257,7 +257,7 @@ def fit(typ='line',x=None, y=None, yerr=None,p0=None):
     pcerror = m.perror * np.sqrt(m.fnorm / dof)
     par = [m.params,m.perror,pcerror]
     if(m.status <=0):
-        print 'status = ', m.status
+        print('status = ', m.status)
 
     #=========================================================================#
     #    Calculate goodness of fit and an easy to plot fitted data set
@@ -343,9 +343,9 @@ def arbFit(fct=line,x=None, y=None, yerr=None,p0=None):
     #=========================================================================#
     #                           Set default arrays
     #=========================================================================#
-    if x==None: x = np.arange(len(y))
-    if yerr==None: yerr = np.ones(len(y))
-    if p0 == None: 
+    if x is None: x = np.arange(len(y))
+    if yerr is None: yerr = np.ones(len(y))
+    if p0 is None:
         p0 = np.ones(100)
             
     #=========================================================================#
@@ -374,13 +374,13 @@ def arbFit(fct=line,x=None, y=None, yerr=None,p0=None):
     fa = {'x': x, 'y': y, 'err': yerr}
     m = mpfit(fitfunc, p0, parinfo=parinfo, functkw=fa,quiet=1)
     dof = len(x) - len(m.params)
-    if m.perror==None:
+    if m.perror is None:
         pcerror=None
     else:
         pcerror = m.perror * np.sqrt(m.fnorm / dof)
     par = [m.params,m.perror,pcerror]
     if(m.status <=0):
-        print 'status = ', m.status
+        print('status = ', m.status)
 
     #=========================================================================#
     #    Calculate goodness of fit and an easy to plot fitted data set

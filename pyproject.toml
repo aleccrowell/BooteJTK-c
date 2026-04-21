@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "bootjtk"
+version = "1.0.0"
+description = "Bootstrap JTK analysis for circadian rhythm detection"
+authors = [
+    "Alan L. Hutchison <alanlhutchison@uchicago.edu>",
+    "Alexander Crowell",
+]
+license = "MIT"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.8"
+numpy = ">=1.11.0"
+scipy = ">=0.15.1"
+pandas = ">=1.0.0"
+cython = ">=0.24"
+matplotlib = ">=2.0.0"
+statsmodels = ">=0.6.1"
+setuptools = {version = ">=42", python = ">=3.9"}
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.3,<10.0.0) ; python_version >= \"3.10\""
+]
