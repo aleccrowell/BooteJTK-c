@@ -262,3 +262,65 @@ class TestReadExampleFile:
         assert len(d_data) == 5
         # new_h preserves the full header length (24), not unique timepoints
         assert len(new_h) == len(header)
+
+
+class TestRefDir:
+    def test_ref_dir_attribute_exists(self):
+        assert hasattr(B, '_REF_DIR')
+
+    def test_ref_dir_is_a_directory(self):
+        assert os.path.isdir(B._REF_DIR)
+
+    def test_period_file_exists(self):
+        assert os.path.isfile(os.path.join(B._REF_DIR, 'period24.txt'))
+
+    def test_phases_file_exists(self):
+        assert os.path.isfile(os.path.join(B._REF_DIR, 'phases_00-22_by2.txt'))
+
+    def test_asymmetries_file_exists(self):
+        assert os.path.isfile(os.path.join(B._REF_DIR, 'asymmetries_02-22_by2.txt'))
+
+
+class TestProcessGene:
+    """Tests for the _process_gene worker function."""
+
+    EXAMPLE = os.path.join(os.path.dirname(__file__), '..', 'example', 'TestInput4.txt')
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        from get_stat_probs import get_waveform_list, make_references
+        header, data = B.read_in(self.EXAMPLE)
+        self.header = header
+        d_data, new_header = B.get_data2(header, data[:1], 24.0)
+        self.gene_id = list(d_data.keys())[0]
+        self.d_data_item = d_data[self.gene_id]
+
+        phases = np.array(list(range(0, 24, 2)), dtype=float)
+        widths = np.array(list(range(2, 24, 2)), dtype=float)
+        periods = np.array([24.0])
+        triples = get_waveform_list(periods, phases, widths)
+        dref = make_references(new_header, triples)
+        B._init_worker(triples, dref, new_header)
+
+    def test_returns_tuple_with_gene_id(self):
+        args = (self.gene_id, self.d_data_item, None, None, 10, 'DEFAULT', 'cosine')
+        result = B._process_gene(args)
+        assert result is not None
+        assert result[0] == self.gene_id
+
+    def test_output_line_is_string_list(self):
+        args = (self.gene_id, self.d_data_item, None, None, 10, 'DEFAULT', 'cosine')
+        result = B._process_gene(args)
+        assert result is not None
+        _, out_line, *_ = result
+        assert isinstance(out_line, list)
+        assert all(isinstance(v, str) for v in out_line)
+
+    def test_output_has_expected_fields(self):
+        args = (self.gene_id, self.d_data_item, None, None, 10, 'DEFAULT', 'cosine')
+        result = B._process_gene(args)
+        assert result is not None
+        _, out_line, *_ = result
+        # First two fields are gene ID and waveform name
+        assert out_line[0] == self.gene_id
+        assert out_line[1] == 'cosine'

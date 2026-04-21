@@ -49,7 +49,13 @@ This produces `bin/get_stat_probs.cpython-*.so`. You must rebuild after any chan
 
 ### Basic example
 
-This command runs 10 bootstrap resamplings on data with 2 replicates per timepoint. It searches phases 0–22h in 2h steps, asymmetries 2–22h in 2h steps, and a 24h period.
+This command runs 10 bootstrap resamplings on data with 2 replicates per timepoint. The `-p`, `-s`, and `-a` ref-file arguments default to the standard 24h-period, 0–22h phase, and 2–22h asymmetry files bundled in `ref_files/`, so they can be omitted when those defaults are appropriate:
+
+```
+./BooteJTK-CalcP.py -f example/TestInput4.txt -x OTHERTEXT -r 2 -z 10
+```
+
+To override the defaults, pass explicit paths:
 
 ```
 ./BooteJTK-CalcP.py -f example/TestInput4.txt \
@@ -59,16 +65,29 @@ This command runs 10 bootstrap resamplings on data with 2 replicates per timepoi
     -x OTHERTEXT -r 2 -z 10
 ```
 
+Run `./BooteJTK-CalcP.py --help` to see all options and their current defaults.
+
+### Waveform shape
+
+Use `-w` to choose the reference waveform shape fitted to each time series:
+
+| Value | Shape |
+|---|---|
+| `cosine` (default) | Smooth sinusoidal peak |
+| `trough` | Triangular trough |
+| `impulse` | Narrow spike |
+| `step` | Rectangular step |
+
+```
+./BooteJTK-CalcP.py -f example/TestInput4.txt -w impulse -r 2 -z 10
+```
+
 ### Parallel processing
 
 Use `-j` to run genes in parallel across multiple CPUs. This is the largest available speedup for datasets with many genes:
 
 ```
-./BooteJTK-CalcP.py -f example/TestInput4.txt \
-    -p ref_files/period24.txt \
-    -s ref_files/phases_00-22_by2.txt \
-    -a ref_files/asymmetries_02-22_by2.txt \
-    -x OTHERTEXT -r 2 -z 50 -j 8
+./BooteJTK-CalcP.py -f example/TestInput4.txt -r 2 -z 50 -j 8
 ```
 
 | `-j` value | Behaviour |

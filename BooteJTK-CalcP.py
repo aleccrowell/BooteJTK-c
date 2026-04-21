@@ -69,10 +69,9 @@ def main(args):
     try:
         assert '.txt' in fn or '.txt' in args.means
     except AssertionError:
-        print 'Please make the suffix of your raw data file or means file  .txt'
+        print('Please make the suffix of your raw data file or means file .txt')
         assert 0
-    
-    
+
     if args.basic==False:
         args.limma=True
         args.vash =True
@@ -80,15 +79,15 @@ def main(args):
         args.limma=True
         args.vash =False
 
-    print 'Basic:', args.basic
-    print 'Limma:', args.limma
-    print 'Vash:', args.vash
-        
+    print('Basic:', args.basic)
+    print('Limma:', args.limma)
+    print('Vash:', args.vash)
+
     #fn_null = args.null
     if args.noreps==True:
         args.prefix = 'NoRepSD_'+args.prefix
-        print 'No replicates, skipping Limma procedure'
-        print 'Estimating time point variance from arrhythmic genes'
+        print('No replicates, skipping Limma procedure')
+        print('Estimating time point variance from arrhythmic genes')
         try:
             df = pd.read_table(fn,index_col='ID')
         except ValueError:
@@ -114,14 +113,14 @@ def main(args):
 
         """Rscript command for Limma"""
         if args.vash==False and fn is not None:
-            print 'Running the Limma commands'
+            print('Running the Limma commands')
             args.prefix = 'Limma_'+args.prefix
             path2script = binpath+'Limma_voom_script.R'
             args.means = fn.replace('.txt','_Means_postLimma.txt')
             args.sds = fn.replace('.txt','_Sds_postLimma.txt')
             args.ns = fn.replace('.txt','_Ns_postLimma.txt')
         elif args.vash==True and fn is not None:
-            print 'Running the Vash commands'
+            print('Running the Vash commands')
             args.prefix = 'Vash_'+args.prefix
             path2script = binpath+'Limma_voom_vash_script.R'
             args.means = fn.replace('.txt','_Means_postVash.txt')
@@ -143,12 +142,12 @@ def main(args):
         #print 'Subprocess call is ', ret
         if ret != 0:
             if ret < 0:
-                print "Killed by signal", -ret
+                print("Killed by signal", -ret)
             else:
-                print "Command failed with return code", ret
+                print("Command failed with return code", ret)
             assert False
     else:
-        print 'Using neither Limma nor Vash'
+        print('Using neither Limma nor Vash')
         pass
     
     fn_out,fn_out_pkl,header = BooteJTK.main(args)
@@ -165,21 +164,21 @@ def main(args):
     sims = 1000
     with open(fn_null,'w') as g:
         g.write('\t'.join(['#']+header)+'\n')
-        for i in xrange(sims):
-            line = ['wnoise_'+str(i)] + map(str,list(np.random.normal(0,1,len(header))))
+        for i in range(sims):
+            line = ['wnoise_'+str(i)] + [str(v) for v in np.random.normal(0,1,len(header))]
             g.write('\t'.join(line)+'\n')
             
     args.filename = fn_null
     
     if args.noreps==True:
-        print 'No replicates, skipping Limma procedure'
-        print 'Estimating time point variance from arrhythmic genes'
+        print('No replicates, skipping Limma procedure')
+        print('Estimating time point variance from arrhythmic genes')
         try:
             df = pd.read_table(fn,index_col='ID')
         except ValueError:
             df = pd.read_table(fn,index_col='#')
         except ValueError:
-            print 'Header needs to begin with "ID" or with "#"'
+            print('Header needs to begin with "ID" or with "#"')
 
         j = pd.read_table(args.jtk,index_col='ID')
         mean = df.loc[j[j.GammaP>0.8].index].std(axis=1).dropna().mean()
@@ -225,10 +224,12 @@ def main(args):
 
 def __create_parser__():
     p = argparse.ArgumentParser(
-        description="Python script for running empirical JTK_CYCLE with asymmetry search as described in Hutchison, Maienschein-Cline, and Chiang et al. Improved statistical methods enable greater sensitivity in rhythm detection for genome-wide data, PLoS Computational Biology 2015 11(3): e1004094. This script was written by Alan L. Hutchison, alanlhutchison@uchicago.edu, Aaron R. Dinner Group, University of Chicago.",
-        epilog="Please contact the correpsonding author if you have any questions.",
-        version=VERSION
+        description="Bootstrap empirical JTK_CYCLE (eJTK) for circadian rhythm detection. "
+                    "See Hutchison et al. PLoS Comput Biol 2015 11(3):e1004094.",
+        epilog="Please contact the corresponding author if you have any questions.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
+    p.add_argument('--version', '-V', action='version', version='%(prog)s ' + VERSION)
 
                    
     #p.add_argument("-t", "--test",
@@ -329,11 +330,18 @@ def __create_parser__():
     analysis.add_argument('-z',"--size",
                           dest="size",
                           type=int,
-                          metavar="int",
+                          metavar="N",
                           action='store',
                           default=50,
-                          help="Number of bootstraps to be performed")
-    
+                          help="Number of bootstrap resamples per gene.")
+
+    analysis.add_argument('-j', '--workers',
+                          dest='workers',
+                          type=int,
+                          metavar='N',
+                          action='store',
+                          default=1,
+                          help='Parallel worker processes. 0 = all available CPUs.')
 
     analysis.add_argument('-w',"--waveform",
                           dest="waveform",
