@@ -57,7 +57,7 @@ def main(args):
             taus = pd.read_table(fn_pkl)['TauMean']
             keys,intvalues,yerr,p0,limit = prepare(taus)
         if fit:
-            for _ in xrange(2):
+            for _ in range(2):
                 params = GammaFit(keys,intvalues,yerr,p0,limit)
                 p0 = params[0]
     params = p0
@@ -201,7 +201,7 @@ def GammaFit(x,ydata,yerr,p0,limit):
     # Convert the parameter output to the pars output format from easyfit
     par = [m.params,m.perror,pcerror]
     if(m.status <=0):
-        print 'status = ', m.status
+        print('status = ', m.status)
     return par
 
 
