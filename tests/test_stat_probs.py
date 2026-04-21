@@ -7,6 +7,7 @@ from scipy.stats import kendalltau as scipy_kt
 from get_stat_probs import (
     kt,
     generate_base_reference,
+    get_matches,
     get_waveform_list,
     make_references,
     farctanh,
@@ -74,6 +75,26 @@ class TestGenerateBaseReference:
     def test_trough_values_bounded(self):
         ref = generate_base_reference(self.HEADER, 'trough', 24.0, 0.0, 12.0)
         assert all(-1.001 <= v <= 1.001 for v in ref)
+
+    def test_returns_numpy_array(self):
+        ref = generate_base_reference(self.HEADER, 'cosine', 24.0, 0.0, 12.0)
+        assert isinstance(ref, np.ndarray)
+
+    def test_impulse_correct_length(self):
+        ref = generate_base_reference(self.HEADER, 'impulse', 24.0, 0.0, 12.0)
+        assert len(ref) == len(self.HEADER)
+
+    def test_step_correct_length(self):
+        ref = generate_base_reference(self.HEADER, 'step', 24.0, 0.0, 12.0)
+        assert len(ref) == len(self.HEADER)
+
+    def test_impulse_values_nonnegative(self):
+        ref = generate_base_reference(self.HEADER, 'impulse', 24.0, 0.0, 12.0)
+        assert all(v >= -1e-9 for v in ref)
+
+    def test_step_values_binary(self):
+        ref = generate_base_reference(self.HEADER, 'step', 24.0, 0.0, 12.0)
+        assert all(v in (0.0, 1.0) for v in ref)
 
 
 class TestGetWaveformList:
@@ -160,3 +181,32 @@ class TestHelpers:
         for x in [-24, -12, 0, 12, 24, 36]:
             result = periodic(float(x))
             assert -12 < result <= 12
+
+
+class TestGetMatches:
+    HEADER = list(range(0, 24, 2))
+    PHASES = np.array(list(range(0, 24, 2)))
+    WIDTHS = np.array(list(range(2, 24, 2)))
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        triples = get_waveform_list(np.array([24]), self.PHASES, self.WIDTHS)
+        self.dref = make_references(self.HEADER, triples)
+        self.triple = triples[0]
+        self.new_header = tuple(self.HEADER)
+
+    def test_returns_list_of_seven(self):
+        kkey = tuple(sorted(range(len(self.HEADER))))
+        result = get_matches(kkey, self.triple, self.dref, list(self.new_header))
+        assert len(result) == 7
+
+    def test_tau_nonnegative(self):
+        # get_matches always returns abs(tau) in position 0
+        kkey = tuple(sorted(range(len(self.HEADER))))
+        result = get_matches(kkey, self.triple, self.dref, list(self.new_header))
+        assert result[0] >= 0.0
+
+    def test_p_value_finite(self):
+        kkey = tuple(sorted(range(len(self.HEADER))))
+        result = get_matches(kkey, self.triple, self.dref, list(self.new_header))
+        assert math.isfinite(result[1])
