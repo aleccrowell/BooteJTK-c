@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Cython compiled extensions
+*.so
+*.pyd
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Test cache
+.pytest_cache/
+
+# Pickle outputs (generated at runtime)
+*.pkl
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
