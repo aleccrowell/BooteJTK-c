@@ -1,3 +1,7 @@
+ # Note:
+
+ This is a fork of [BooteJTK](https://github.com/alanlhutchison/BooteJTK) by Alan Hutchison, intended to improve compatibility with [LIMBR](https://github.com/aleccrowell/LIMBR). 
+
 #BooteJTK
 
 BooteJTK is an implementation of empirical JTK (eJTK) on parametrically bootstrapped resamplings of time series.
