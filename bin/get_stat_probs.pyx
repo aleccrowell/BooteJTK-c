@@ -45,8 +45,7 @@ def get_stat_probs(dorder,new_header,triples,dref,int size):
 
     rs = []
     for kkey in dorder:
-        lamb_get_matches = lambda triple: get_matches(kkey,triple,dref,new_header)
-        res = np.array(map(lamb_get_matches,triples))
+        res = np.array([get_matches(kkey, triple, dref, new_header) for triple in triples])
         r = pick_best_match(res)
         #r = list(r)
           
@@ -62,8 +61,8 @@ def get_stat_probs(dorder,new_header,triples,dref,int size):
         d_nagene.setdefault(r[4],0)
         d_nagene[r[4]]+=dorder[kkey]
 
-        for _ in xrange(int(np.round(size*dorder[kkey]))):
-            rs.append(r)
+        count = int(np.round(size * dorder[kkey]))
+        rs.extend([r] * count)
     rs = np.array(rs)
     #print rs
 
@@ -78,63 +77,32 @@ def get_stat_probs(dorder,new_header,triples,dref,int size):
     out1,out2 = [m_per,s_per,m_ph,s_ph,m_na,s_na],[m_tau,s_tau]
     return out1,out2,d_taugene,d_pergene,d_phgene,d_nagene
 
-def generate_base_reference(header,waveform="cosine",double period=24.,double phase=0.,double width=12.):
+def generate_base_reference(header, waveform="cosine", double period=24., double phase=0., double width=12.):
     """
-    This will generate a waveform with a given phase and period based on the header, 
+    Generate a reference waveform for the given timepoints. Returns a numpy array.
     """
-    cdef double coef,w,tpoint
-    #print header,phase
-    ZTs = np.array(header,dtype=float)
+    cdef double coef, w
+    ZTs = np.array(header, dtype=float)
     coef = 2.0 * np.pi / period
-    w = width * coef
-    tpoints = (ZTs - phase) *coef
-    if waveform=='cosine':
-
-        def cosine(double x,double w):
-            cdef double y
-            x = x % (2.*np.pi)
-            w = w % (2.*np.pi)
-            if x <= w:
-                y = np.cos(x/(w/np.pi))
-            elif x > w:
-                y = np.cos( (x+2.*(np.pi-w))*np.pi/ (2*np.pi - w) )
-            return y
-        f_wav = cosine
-        
-    elif waveform=='trough':
-        def trough(double x,double w):
-            cdef double y
-            x = x % (2*np.pi)
-            w = w % (2*np.pi)
-            if x <= w:
-                y = 1 + -x/w
-            elif x > w:
-                y = (x-w)/(2*np.pi - w)
-            return y
-        f_wav = trough
-
-    elif waveform=='impulse':
-        def impulse(double x, _):
-            cdef double w,d,y
-            w = 3.*np.pi/4.
-            x = x % (2.*np.pi)
-            d = min(x, np.abs(np.pi*2 - x))
-            y = max(-2.*d/w + 1.0, 0.0)
-            return y
-        f_wav = impulse
-        
-    elif waveform=='step':
-        def step(double x, _):
-            cdef double w,y
-            w = np.pi
-            x = x % (2.*np.pi)
-            y = 1.0 if x < w else 0.0
-            return y
-        f_wav = step
-
-        
-    reference = [f_wav(tpoint,w) for tpoint in tpoints]
-    return reference
+    w = (width * coef) % (2.0 * np.pi)
+    tpoints = ((ZTs - phase) * coef) % (2.0 * np.pi)
+    if waveform == 'cosine':
+        return np.where(
+            tpoints <= w,
+            np.cos(tpoints / (w / np.pi)),
+            np.cos((tpoints + 2.0 * (np.pi - w)) * np.pi / (2.0 * np.pi - w))
+        )
+    elif waveform == 'trough':
+        return np.where(
+            tpoints <= w,
+            1.0 - tpoints / w,
+            (tpoints - w) / (2.0 * np.pi - w)
+        )
+    elif waveform == 'impulse':
+        d = np.minimum(tpoints, np.abs(2.0 * np.pi - tpoints))
+        return np.maximum(-2.0 * d / (3.0 * np.pi / 4.0) + 1.0, 0.0)
+    elif waveform == 'step':
+        return np.where(tpoints < np.pi, 1.0, 0.0)
 
 def farctanh(double x):
     if x>0.99:
@@ -159,25 +127,23 @@ def pick_best_match(res):
     
     res = np.array(res)
     taus = res[:,0]
-    #maxtau = max(taus)
     tau_mask = (max(taus)==taus)
     if np.sum(tau_mask)==1:
-        ind = list(tau_mask).index(True)
+        ind = int(np.argmax(tau_mask))
         return res[ind]
 
     res = res[tau_mask]
     phases = np.abs(res[:,3]-res[:,5])
-    #minphasediff = min(phases)
     phasemask = (min(phases)==phases)
     if np.sum(phasemask)==1:
-        ind = list(phasemask).index(True)
+        ind = int(np.argmax(phasemask))
         return res[ind]
 
     res = res[phasemask]
     diffs = np.abs(res[:,4]-res[:,6])
     diffmask = (min(diffs)==diffs)
     if np.sum(diffmask)==1:
-        ind = list(diffmask).index(True)
+        ind = int(np.argmax(diffmask))
         return res[ind]
 
     ### If we've gotten down here everything has failed
@@ -232,24 +198,18 @@ def make_references(new_header,triples,waveform='cosine'):#,period,phase,width):
 
 def get_matches(kkey,triple,d_ref,new_header):
     cdef double period,phase,width,nadir,tau,p
-    
+
     reference = d_ref[tuple(triple)]
-    reference = map(float,reference)
-    kkey = map(float,kkey)
     period,phase,width = triple
     nadir = (phase+width)%period
-    serie = kkey
-    #print reference
-    #print serie
-    tau,p = kt(reference,serie)#generate_mod_series(reference,serie)
+    tau,p = kt(reference, kkey)
     p = p/2.0
     tau = farctanh(tau)
-    maxloc = new_header[serie.index(max(serie))]
-    minloc = new_header[serie.index(min(serie))]
-    r =  [tau,p,period,phase,nadir,maxloc,minloc]
+    maxloc = new_header[kkey.index(max(kkey))]
+    minloc = new_header[kkey.index(min(kkey))]
+    r = [tau,p,period,phase,nadir,maxloc,minloc]
     if tau < 0:
         r = [np.abs(tau),p,period,nadir,phase,maxloc,minloc]
-    
     return r
 
 def kt(x, y, initial_lexsort=True):
@@ -376,7 +336,7 @@ def kt(x, y, initial_lexsort=True):
     # compute joint ties
     first = 0
     t = 0
-    for i in xrange(1, n):
+    for i in range(1, n):
         if x[perm[first]] != x[perm[i]] or y[perm[first]] != y[perm[i]]:
             t += ((i - first) * (i - first - 1)) // 2
             first = i
@@ -385,7 +345,7 @@ def kt(x, y, initial_lexsort=True):
     # compute ties in x
     first = 0
     u = 0
-    for i in xrange(1,n):
+    for i in range(1,n):
         if x[perm[first]] != x[perm[i]]:
             u += ((i - first) * (i - first - 1)) // 2
             first = i
@@ -396,7 +356,7 @@ def kt(x, y, initial_lexsort=True):
     # compute ties in y after mergesort with counting
     first = 0
     v = 0
-    for i in xrange(1,n):
+    for i in range(1,n):
         if y[perm[first]] != y[perm[i]]:
             v += ((i - first) * (i - first - 1)) // 2
             first = i

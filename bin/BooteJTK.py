@@ -26,6 +26,7 @@ from scipy.stats import rankdata
 from scipy.stats import norm
 from scipy.special import polygamma
 
+import multiprocessing
 import pickle
 #from operator import itemgetter
 import sys
@@ -38,6 +39,42 @@ from get_stat_probs import get_waveform_list as gsp_get_waveform_list
 from get_stat_probs import make_references as gsp_make_references
 from get_stat_probs import  kt ### this is kendalltau
 
+
+
+_g_triples = None
+_g_dref = None
+_g_new_header = None
+
+def _init_worker(triples, dref, new_header):
+    global _g_triples, _g_dref, _g_new_header
+    _g_triples, _g_dref, _g_new_header = triples, dref, new_header
+
+def _process_gene(args):
+    geneID, d_data_item, serie_item, precomputed_dorder, size, fn, waveform = args
+    if fn == 'DEFAULT' or serie_item is None:
+        mmax = mmin = MAX_AMP = sIQR_FC = smean = sstd = sFC = np.nan
+    else:
+        mmax, mmin, MAX_AMP = series_char(serie_item)
+        sIQR_FC = IQR_FC(serie_item)
+        smean = series_mean(serie_item)
+        sstd = series_std(serie_item)
+        sFC = FC(serie_item)
+    s_stats = [smean, sstd, mmax, mmin, MAX_AMP, sFC, sIQR_FC, size]
+    if precomputed_dorder is not None:
+        dorder = precomputed_dorder
+        gene_order_probs = precomputed_dorder
+        gene_boots = None
+    else:
+        d_op, d_b = get_order_prob({geneID: d_data_item}, size)
+        if geneID not in d_op:
+            return None
+        dorder = d_op[geneID]
+        gene_order_probs = d_op[geneID]
+        gene_boots = d_b[geneID]
+    out1, out2, d_taugene, d_pergene, d_phgene, d_nagene = gsp_get_stat_probs(
+        dorder, _g_new_header, _g_triples, _g_dref, size)
+    out_line = [str(l) for l in [geneID, waveform] + out1 + s_stats + out2]
+    return geneID, out_line, d_taugene, d_phgene, gene_order_probs, gene_boots
 
 
 def main(args):
@@ -163,57 +200,38 @@ def main(args):
     id_list = d_series.keys() if id_list==[] else id_list
     out_lines = []
 
-    for geneID in d_data_master:
+    d_order_probs_preloaded = d_order_probs if 'premade' in opt else {}
+    gene_ids = [geneID for geneID in d_data_master if geneID in id_list]
+    gene_args = [
+        (geneID, d_data_master[geneID], d_series.get(geneID),
+         d_order_probs_preloaded.get(geneID),
+         size, fn, waveform)
+        for geneID in gene_ids
+    ]
 
-        ### If we have an ID list, we only want to deal with data from it.
-        if geneID in id_list:
+    n_workers = args.workers
+    pool_size = n_workers if n_workers > 0 else None
+    if n_workers == 1:
+        _init_worker(triples, dref, new_header)
+        results = [_process_gene(a) for a in gene_args]
+    else:
+        with multiprocessing.Pool(pool_size, initializer=_init_worker,
+                                   initargs=(triples, dref, new_header)) as pool:
+            results = pool.map(_process_gene, gene_args)
 
-            if fn=='DEFAULT':
-                mmax,mmin,MAX_AMP = np.nan,np.nan,np.nan
-                sIQR_FC = np.nan
-                smean = np.nan
-                sstd = np.nan
-                sFC = np.nan
-            else:
-                serie = d_series[geneID]                
-                mmax,mmin,MAX_AMP=series_char(serie)
-                sIQR_FC=IQR_FC(serie)
-                smean = series_mean(serie)
-                sstd = series_std(serie)
-                sFC = FC(serie)
-
-            s_stats = [smean,sstd,mmax,mmin,MAX_AMP,sFC,sIQR_FC,size]
-
-            ### Need to make this file if it doesn't exist already
-            if 'premade' not in opt:
-                d_data_sub = {geneID:d_data_master[geneID]}
-                d_data_master1 = {**d_data_master1, **d_data_sub}
-                #print 'd_data_sub[0] is', d_data_sub[d_data_sub.keys()[0]]
-                d_order_probs,d_boots = get_order_prob(d_data_sub,size)
-                d_order_probs_master = {**d_order_probs_master, **d_order_probs}
-                d_boots_master = {**d_boots_master, **d_boots}
-                
-            if geneID in d_order_probs:
-                out1,out2,d_taugene,d_pergene,d_phgene,d_nagene = gsp_get_stat_probs(d_order_probs[geneID],new_header,triples,dref,size)
-                out_line = [geneID,waveform]+out1+s_stats+out2
-                out_line = [str(l) for l in out_line]
-                out_lines.append(out_line)
-
-                done.append(geneID)
-
-                d_tau = {**d_tau, geneID: d_taugene}
-                d_ph = {**d_ph, geneID: d_phgene}
-
-        
-        if len(remaining)>0:
-            if '.txt' in fn_out:
-                fn_remaining = fn_out.replace('.txt','_remaining_list.txt')
-            else:
-                fn_remaining = fn_out+'_remaining_list.txt'
-            g = open(fn_remaining,'a')
-            for r in remaining:
-                g.write(r+'\n')
-            g.close()
+    for result in results:
+        if result is None:
+            continue
+        geneID, out_line, d_taugene, d_phgene, gene_order_probs, gene_boots = result
+        out_lines.append(out_line)
+        done.append(geneID)
+        d_tau = {**d_tau, geneID: d_taugene}
+        d_ph = {**d_ph, geneID: d_phgene}
+        if write_pickle and 'premade' not in opt:
+            d_data_master1[geneID] = d_data_master[geneID]
+            d_order_probs_master[geneID] = gene_order_probs
+            if gene_boots is not None:
+                d_boots_master[geneID] = gene_boots
             
     if write_pickle==True: 
         pickle.dump([d_tau,d_ph],open(fn_out_pkl_vars,'wb'))                    
@@ -608,8 +626,8 @@ def __create_parser__():
     p = argparse.ArgumentParser(
         description="Python script for running empirical JTK_CYCLE with asymmetry search as described in Hutchison, Maienschein-Cline, and Chiang et al. Improved statistical methods enable greater sensitivity in rhythm detection for genome-wide data, PLoS Computational Biology 2015 11(3): e1004094. This script was written by Alan L. Hutchison, alanlhutchison@uchicago.edu, Aaron R. Dinner Group, University of Chicago.",
         epilog="Please contact the correpsonding author if you have any questions.",
-        version=VERSION
         )
+    p.add_argument('--version', '-V', action='version', version='%(prog)s ' + VERSION)
 
                    
     #p.add_argument("-t", "--test",
@@ -722,6 +740,14 @@ def __create_parser__():
                           action='store',
                           default=50,
                           help="Number of bootstraps to be performed")
+
+    analysis.add_argument('-j', '--workers',
+                          dest='workers',
+                          type=int,
+                          metavar='int',
+                          action='store',
+                          default=1,
+                          help='Number of parallel worker processes. 0 = use all available CPUs (default: 1)')
     
 
     analysis.add_argument('-w',"--waveform",
