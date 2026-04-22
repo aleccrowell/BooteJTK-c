@@ -33,13 +33,12 @@ import argparse
 import time
 import os.path
 
-import subprocess
-import tempfile
 import os
 
 from . import BooteJTK
 from . import CalcP
-from .limma_preprocess import prepare_timeseries, write_preprocessed, write_limma_outputs
+from .limma_preprocess import prepare_timeseries, write_limma_outputs
+from .limma_voom import run_vooma_ebayes, run_vooma_vash
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -116,36 +115,19 @@ def main(args):
             print('Running the Limma commands')
             args.prefix = 'Limma_' + args.prefix
             suffix = 'postLimma'
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_core.R')
         elif args.vash==True and fn is not None:
             print('Running the Vash commands')
             args.prefix = 'Vash_' + args.prefix
             suffix = 'postVash'
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_core.R')
 
         args.means = fn.replace('.txt', f'_Means_{suffix}.txt')
         args.sds   = fn.replace('.txt', f'_Sds_{suffix}.txt')
         args.ns    = fn.replace('.txt', f'_Ns_{suffix}.txt')
 
         df_clean, _ = prepare_timeseries(fn, period_val)
-        fd_in,  fn_tmp_in  = tempfile.mkstemp(suffix='.tsv')
-        fd_out, fn_tmp_out = tempfile.mkstemp(suffix='.tsv')
-        os.close(fd_in)
-        os.close(fd_out)
-        try:
-            write_preprocessed(df_clean, fn_tmp_in)
-            cmd = ['Rscript', path2script, fn_tmp_in, fn_tmp_out, str(period_val)]
-            if args.rnaseq:
-                cmd.append('rnaseq')
-            ret = subprocess.call(cmd)
-            if ret != 0:
-                print("Killed by signal", -ret) if ret < 0 else print("Command failed with return code", ret)
-                assert False
-            long_df = pd.read_table(fn_tmp_out)
-            write_limma_outputs(long_df, pref, suffix)
-        finally:
-            os.unlink(fn_tmp_in)
-            os.unlink(fn_tmp_out)
+        preprocessor = run_vooma_vash if args.vash else run_vooma_ebayes
+        long_df = preprocessor(df_clean, period_val, rnaseq=args.rnaseq)
+        write_limma_outputs(long_df, pref, suffix)
     else:
         print('Using neither Limma nor Vash')
         pass
@@ -197,31 +179,19 @@ def main(args):
         pref_null = fn_null.replace('.txt', '')
         if args.vash==False:
             suffix_null = 'postLimma'
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_core.R')
             args.means = fn_null.replace('.txt', '_Means_postLimma.txt')
             args.sds   = fn_null.replace('.txt', '_Sds_postLimma.txt')
             args.ns    = fn_null.replace('.txt', '_Ns_postLimma.txt')
         else:
             suffix_null = 'postVash'
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_core.R')
             args.means = fn_null.replace('.txt', '_Means_postVash.txt')
             args.sds   = fn_null.replace('.txt', '_Sds_postVash.txt')
             args.ns    = fn_null.replace('.txt', '_Ns_postVash.txt')
 
         df_null_clean, _ = prepare_timeseries(fn_null, period_val)
-        fd_in,  fn_tmp_in  = tempfile.mkstemp(suffix='.tsv')
-        fd_out, fn_tmp_out = tempfile.mkstemp(suffix='.tsv')
-        os.close(fd_in)
-        os.close(fd_out)
-        try:
-            write_preprocessed(df_null_clean, fn_tmp_in)
-            cmd = ['Rscript', path2script, fn_tmp_in, fn_tmp_out, str(period_val)]
-            subprocess.call(cmd)
-            long_null = pd.read_table(fn_tmp_out)
-            write_limma_outputs(long_null, pref_null, suffix_null)
-        finally:
-            os.unlink(fn_tmp_in)
-            os.unlink(fn_tmp_out)
+        preprocessor = run_vooma_vash if args.vash else run_vooma_ebayes
+        long_null = preprocessor(df_null_clean, period_val, rnaseq=args.rnaseq)
+        write_limma_outputs(long_null, pref_null, suffix_null)
     else:
         pass
     
