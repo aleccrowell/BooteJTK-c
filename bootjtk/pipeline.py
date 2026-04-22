@@ -34,13 +34,12 @@ import time
 import os.path
 
 import subprocess
-#from get_stat_probs import get_stat_probs as gsp_get_stat_probs
-#from get_stat_probs import get_waveform_list as gsp_get_waveform_list
-#from get_stat_probs import make_references as gsp_make_references
-#from get_stat_probs import  kt ### this is kendalltau
+import tempfile
+import os
 
 from . import BooteJTK
 from . import CalcP
+from .limma_preprocess import prepare_timeseries, write_preprocessed, write_limma_outputs
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -110,41 +109,43 @@ def main(args):
         
     elif args.limma==True:
 
-        """Rscript command for Limma"""
+        pref = fn.replace('.txt', '')
+        period_val = float(pd.read_table(fn_period, header=None)[0][0])
+
         if args.vash==False and fn is not None:
             print('Running the Limma commands')
-            args.prefix = 'Limma_'+args.prefix
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_script.R')
-            args.means = fn.replace('.txt','_Means_postLimma.txt')
-            args.sds = fn.replace('.txt','_Sds_postLimma.txt')
-            args.ns = fn.replace('.txt','_Ns_postLimma.txt')
+            args.prefix = 'Limma_' + args.prefix
+            suffix = 'postLimma'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_core.R')
         elif args.vash==True and fn is not None:
             print('Running the Vash commands')
-            args.prefix = 'Vash_'+args.prefix
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_script.R')
-            args.means = fn.replace('.txt','_Means_postVash.txt')
-            args.sds = fn.replace('.txt','_Sds_postVash.txt')
-            args.ns = fn.replace('.txt','_Ns_postVash.txt')
+            args.prefix = 'Vash_' + args.prefix
+            suffix = 'postVash'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_core.R')
 
-        command = 'Rscript'
+        args.means = fn.replace('.txt', f'_Means_{suffix}.txt')
+        args.sds   = fn.replace('.txt', f'_Sds_{suffix}.txt')
+        args.ns    = fn.replace('.txt', f'_Ns_{suffix}.txt')
 
-        pref=fn.replace('.txt','')
-        #print fn_period
-        #print pd.read_table(fn_period,header=None)
-        period=str(pd.read_table(fn_period,header=None)[0][0])        
-        if args.rnaseq:
-            arguments = [fn, pref, period,'rnaseq']
-        else:
-            arguments = [fn, pref, period]            
-        cmd = [command, path2script] + arguments
-        ret = subprocess.call(cmd)
-        #print 'Subprocess call is ', ret
-        if ret != 0:
-            if ret < 0:
-                print("Killed by signal", -ret)
-            else:
-                print("Command failed with return code", ret)
-            assert False
+        df_clean, _ = prepare_timeseries(fn, period_val)
+        fd_in,  fn_tmp_in  = tempfile.mkstemp(suffix='.tsv')
+        fd_out, fn_tmp_out = tempfile.mkstemp(suffix='.tsv')
+        os.close(fd_in)
+        os.close(fd_out)
+        try:
+            write_preprocessed(df_clean, fn_tmp_in)
+            cmd = ['Rscript', path2script, fn_tmp_in, fn_tmp_out, str(period_val)]
+            if args.rnaseq:
+                cmd.append('rnaseq')
+            ret = subprocess.call(cmd)
+            if ret != 0:
+                print("Killed by signal", -ret) if ret < 0 else print("Command failed with return code", ret)
+                assert False
+            long_df = pd.read_table(fn_tmp_out)
+            write_limma_outputs(long_df, pref, suffix)
+        finally:
+            os.unlink(fn_tmp_in)
+            os.unlink(fn_tmp_out)
     else:
         print('Using neither Limma nor Vash')
         pass
@@ -193,24 +194,34 @@ def main(args):
         args.sds = fn_sds
         args.ns = fn_ns
     elif args.limma==True:
-        """Rscript command for Limma"""
+        pref_null = fn_null.replace('.txt', '')
         if args.vash==False:
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_script.R')
-            args.means = fn_null.replace('.txt','_Means_postLimma.txt')
-            args.sds = fn_null.replace('.txt','_Sds_postLimma.txt')
-            args.ns = fn_null.replace('.txt','_Ns_postLimma.txt')
+            suffix_null = 'postLimma'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_core.R')
+            args.means = fn_null.replace('.txt', '_Means_postLimma.txt')
+            args.sds   = fn_null.replace('.txt', '_Sds_postLimma.txt')
+            args.ns    = fn_null.replace('.txt', '_Ns_postLimma.txt')
         else:
-            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_script.R')
-            args.means = fn_null.replace('.txt','_Means_postVash.txt')
-            args.sds = fn_null.replace('.txt','_Sds_postVash.txt')
-            args.ns = fn_null.replace('.txt','_Ns_postVash.txt')
+            suffix_null = 'postVash'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_core.R')
+            args.means = fn_null.replace('.txt', '_Means_postVash.txt')
+            args.sds   = fn_null.replace('.txt', '_Sds_postVash.txt')
+            args.ns    = fn_null.replace('.txt', '_Ns_postVash.txt')
 
-        command = 'Rscript'
-        pref=fn_null.replace('.txt','')
-        period=str(pd.read_table(fn_period,header=None)[0][0])
-        arguments = [fn_null, pref, period]
-        cmd = [command, path2script] + arguments
-        subprocess.call(cmd)    
+        df_null_clean, _ = prepare_timeseries(fn_null, period_val)
+        fd_in,  fn_tmp_in  = tempfile.mkstemp(suffix='.tsv')
+        fd_out, fn_tmp_out = tempfile.mkstemp(suffix='.tsv')
+        os.close(fd_in)
+        os.close(fd_out)
+        try:
+            write_preprocessed(df_null_clean, fn_tmp_in)
+            cmd = ['Rscript', path2script, fn_tmp_in, fn_tmp_out, str(period_val)]
+            subprocess.call(cmd)
+            long_null = pd.read_table(fn_tmp_out)
+            write_limma_outputs(long_null, pref_null, suffix_null)
+        finally:
+            os.unlink(fn_tmp_in)
+            os.unlink(fn_tmp_out)
     else:
         pass
     
@@ -379,7 +390,7 @@ def __create_parser__():
                           Provided file is "period_24.txt"')
 
 
-    analysis.add_argument("-V","--vash",
+    analysis.add_argument("--vash",
                           dest="vash",
                           action='store_true',
                           default=False,
