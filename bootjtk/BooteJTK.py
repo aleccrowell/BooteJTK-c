@@ -553,11 +553,11 @@ def eBayes(d_data,D_null={}):
             return y
 
         if D_null!={}:
-            dg = np.hstack(np.array(D_null.values())[:,2])
-            s  = np.hstack(np.array(D_null.values())[:,1])            
+            dg = np.hstack(np.array(list(D_null.values()))[:,2])
+            s  = np.hstack(np.array(list(D_null.values()))[:,1])
         else:
-            dg = np.hstack(np.array(d_data.values())[:,2])
-            s  = np.hstack(np.array(d_data.values())[:,1])
+            dg = np.hstack(np.array(list(d_data.values()))[:,2])
+            s  = np.hstack(np.array(list(d_data.values()))[:,1])
         #print D_null.keys()    
         #print dg,s
         G = len(d_data)
