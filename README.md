@@ -20,7 +20,7 @@ Based on [BooteJTK](https://github.com/alanlhutchison/BooteJTK) by Alan Hutchiso
 pip install bootjtk
 ```
 
-Requires Python 3.8 or later. All dependencies (numpy, scipy, pandas, matplotlib, statsmodels) are installed automatically.
+Requires Python 3.8 or later. All dependencies (numpy, scipy, pandas, matplotlib, statsmodels) are installed automatically. No R installation is required.
 
 
 ## Quick start
@@ -48,15 +48,32 @@ bootejtk-calcp -f <input_file> -x <prefix> -r <replicates> -z <bootstraps> [opti
 |---|---|---|
 | `-f` / `--filename` | Input data file (tab-delimited, header row starting with `#` or `ID`) | required |
 | `-x` / `--prefix` | Output file prefix | required |
-| `-r` / `--reps` | Number of replicates per timepoint | `1` |
-| `-z` / `--size` | Number of bootstrap resamplings | `500` |
+| `-r` / `--reps` | Number of replicates per timepoint | `2` |
+| `-z` / `--size` | Number of bootstrap resamplings | `50` |
 | `-j` / `--workers` | Worker processes (`0` = all CPUs) | `1` |
 | `-w` / `--waveform` | Reference waveform shape (see below) | `cosine` |
 | `-p` / `--period` | Period reference file | bundled 24 h file |
 | `-s` / `--phase` | Phase reference file | bundled 0–22 h by 2 file |
 | `-a` / `--width` | Asymmetry reference file | bundled 2–22 h by 2 file |
+| `-B` / `--basic` | Skip variance shrinkage preprocessing | off |
+| `-L` / `--limma` | Use limma vooma variance estimation only (without vash imputation) | off |
+| `--vash` | Use vash NA imputation before variance estimation | off |
+| `-U` / `--noreps` | No replicates mode: estimate variance from arrhythmic genes | off |
+| `-R` / `--rnaseq` | RNA-seq mode (passed to preprocessing) | off |
+| `-W` / `--write` | Write pickle output files (`.pkl`) from BooteJTK | off |
 
 Run `bootejtk-calcp --help` to see all options and current defaults.
+
+### Preprocessing / variance shrinkage
+
+By default, `bootejtk-calcp` applies vooma-style variance estimation with NA imputation and empirical Bayes shrinkage (the equivalent of `--limma --vash`). This preprocessing is implemented entirely in Python — no R installation is required.
+
+| Flag | Behaviour |
+|---|---|
+| *(default, no flag)* | Run limma vooma + vash NA imputation + eBayes shrinkage |
+| `-L` / `--limma` | Run limma vooma + eBayes shrinkage (no NA imputation) |
+| `--vash` | Enable vash NA imputation (implied by default) |
+| `-B` / `--basic` | Skip all variance shrinkage; use raw values directly |
 
 ### `bootejtk` — core analysis only
 
@@ -105,15 +122,15 @@ Time labels can use decimal values (e.g. `ZT14.7`) and do not need to be evenly 
 
 ## Output files
 
-Running `bootejtk-calcp` produces five output files, all prefixed with the value passed to `-x`:
+Running `bootejtk-calcp` produces output files prefixed with the value passed to `-x`:
 
 | File | Contents |
 |---|---|
 | `*_GammaP.txt` | BooteJTK output with Gamma-fitted p-values |
 | `*.txt` | Main BooteJTK output (best-matching waveform per gene, feeds into CalcP) |
-| `*_order_probs.pkl` | Pickle: per-gene `[means, stds, ns]` and rank-order bootstrap frequencies |
-| `*_order_probs_vars.pkl` | Pickle: per-gene tau and phase probability distributions |
 | `*_NULL1000.txt` | Randomly generated null time series used to fit the null tau distribution |
+| `*_order_probs.pkl` | *(requires `-W`)* Pickle: per-gene `[means, stds, ns]` and rank-order bootstrap frequencies |
+| `*_order_probs_vars.pkl` | *(requires `-W`)* Pickle: per-gene tau and phase probability distributions |
 
 > Running the example command on an already-existing output directory appends `_1` to output filenames.
 
