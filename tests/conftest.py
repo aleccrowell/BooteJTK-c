@@ -1,5 +1,5 @@
 import sys
 import os
 
-# Ensure bin/ is on the path for all tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bin'))
+# Ensure the project root is on the path so `bootjtk` is importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

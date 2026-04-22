@@ -39,11 +39,10 @@ import subprocess
 #from get_stat_probs import make_references as gsp_make_references
 #from get_stat_probs import  kt ### this is kendalltau
 
-binpath=os.path.join(os.path.dirname(sys.argv[0]),'bin/')
-sys.path.insert(1,binpath)
+from . import BooteJTK
+from . import CalcP
 
-import BooteJTK
-import CalcP
+_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def main(args):
 
@@ -115,14 +114,14 @@ def main(args):
         if args.vash==False and fn is not None:
             print('Running the Limma commands')
             args.prefix = 'Limma_'+args.prefix
-            path2script = binpath+'Limma_voom_script.R'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_script.R')
             args.means = fn.replace('.txt','_Means_postLimma.txt')
             args.sds = fn.replace('.txt','_Sds_postLimma.txt')
             args.ns = fn.replace('.txt','_Ns_postLimma.txt')
         elif args.vash==True and fn is not None:
             print('Running the Vash commands')
             args.prefix = 'Vash_'+args.prefix
-            path2script = binpath+'Limma_voom_vash_script.R'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_script.R')
             args.means = fn.replace('.txt','_Means_postVash.txt')
             args.sds = fn.replace('.txt','_Sds_postVash.txt')
             args.ns = fn.replace('.txt','_Ns_postVash.txt')
@@ -196,12 +195,12 @@ def main(args):
     elif args.limma==True:
         """Rscript command for Limma"""
         if args.vash==False:
-            path2script = binpath+'Limma_voom_script.R'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_script.R')
             args.means = fn_null.replace('.txt','_Means_postLimma.txt')
             args.sds = fn_null.replace('.txt','_Sds_postLimma.txt')
             args.ns = fn_null.replace('.txt','_Ns_postLimma.txt')
         else:
-            path2script = binpath+'Limma_voom_vash_script.R'
+            path2script = os.path.join(_PKG_DIR, 'Limma_voom_vash_script.R')
             args.means = fn_null.replace('.txt','_Means_postVash.txt')
             args.sds = fn_null.replace('.txt','_Sds_postVash.txt')
             args.ns = fn_null.replace('.txt','_Ns_postVash.txt')
@@ -443,7 +442,11 @@ def __create_parser__():
 
 
 
-if __name__=="__main__":
+def cli():
     parser = __create_parser__()
     args = parser.parse_args()
     main(args)
+
+
+if __name__=="__main__":
+    cli()

@@ -8,7 +8,7 @@ Levenberg–Marquardt algorithm provided by mpfit. A full description of the
 suppoerted functions and how to use the wrapper is given in easyfit.fit
 '''
 import numpy as np
-from mpfit import mpfit
+from .mpfit import mpfit
 import warnings
 
 

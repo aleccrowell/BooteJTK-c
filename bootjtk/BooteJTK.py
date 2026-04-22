@@ -35,12 +35,12 @@ import time
 import os
 import os.path
 
-from get_stat_probs import get_stat_probs as gsp_get_stat_probs
-from get_stat_probs import get_waveform_list as gsp_get_waveform_list
-from get_stat_probs import make_references as gsp_make_references
-from get_stat_probs import kt
+from .get_stat_probs import get_stat_probs as gsp_get_stat_probs
+from .get_stat_probs import get_waveform_list as gsp_get_waveform_list
+from .get_stat_probs import make_references as gsp_make_references
+from .get_stat_probs import kt
 
-_REF_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'ref_files')
+_REF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ref_files')
 
 
 
@@ -797,7 +797,11 @@ def __create_parser__():
 
 
 
-if __name__=="__main__":
+def cli():
     parser = __create_parser__()
     args = parser.parse_args()
     main(args)
+
+
+if __name__=="__main__":
+    cli()

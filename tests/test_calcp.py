@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-import CalcP
+import bootjtk.CalcP as CalcP
 
 
 class TestEmpP:

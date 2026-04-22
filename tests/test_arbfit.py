@@ -1,8 +1,8 @@
-"""Tests for model functions and fitting routines in bin/arbfit.py."""
+"""Tests for model functions and fitting routines in bootjtk/arbfit.py."""
 import numpy as np
 import pytest
 
-import arbfit
+import bootjtk.arbfit as arbfit
 
 
 class TestLinear:

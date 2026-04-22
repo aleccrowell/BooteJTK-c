@@ -9,7 +9,7 @@ Credit for the arbfit code goes to Nablaquabla
 """
 import numpy as np
 import matplotlib.pylab as plt
-from mpfit import mpfit
+from .mpfit import mpfit
 
 VERSION="0.9"
 
@@ -21,7 +21,7 @@ import sys
 import argparse
 import itertools as it
 import time
-import arbfit
+from . import arbfit
 import pickle
 arbFit = arbfit.arbFit
 #import matplotlib.pyplot as plt
@@ -236,8 +236,12 @@ def __create_parser__():
     return p
 
 
-if __name__=="__main__":
+def cli():
     parser = __create_parser__()
     args = parser.parse_args()
     main(args)
+
+
+if __name__=="__main__":
+    cli()
 
