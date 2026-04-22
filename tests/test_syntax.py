@@ -5,11 +5,9 @@ the py2→py3 migration.
 
 Two complementary approaches:
   1. py_compile  — catches outright SyntaxErrors in .py files (e.g. bare
-                   `print` statements).
+                   ``print`` statements).
   2. Regex scan  — catches Python 2 built-ins/methods that are runtime
                    errors in Python 3 (e.g. xrange, .iteritems()).
-     A separate scan is applied to .pyx files for bare print statements
-     because py_compile cannot parse Cython source.
 """
 import py_compile
 import re
@@ -18,8 +16,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parent.parent
-_SKIP_DIRS         = {".venv", "__pycache__", ".git", "build", "dist"}
-_SKIP_DIRS_RUNTIME = _SKIP_DIRS | {"tests"}   # test files may reference pattern names as strings
+_SKIP_DIRS = {".venv", "__pycache__", ".git", "build", "dist"}
 
 
 def _collect(suffix, extra_skip=frozenset()):
@@ -29,24 +26,21 @@ def _collect(suffix, extra_skip=frozenset()):
     )
 
 
-_PY_FILES         = _collect(".py")                       # all .py files (syntax check)
-_PYX_FILES        = _collect(".pyx")                      # all .pyx files
-_SOURCE_PY_FILES  = _collect(".py",  extra_skip={"tests"})  # non-test .py (runtime scan)
-_SOURCE_PYX_FILES = _collect(".pyx", extra_skip={"tests"})  # non-test .pyx (runtime scan)
+_PY_FILES        = _collect(".py")                        # all .py files (syntax check)
+_SOURCE_PY_FILES = _collect(".py", extra_skip={"tests"})  # non-test .py (runtime scan)
 
 # Python 2 built-ins / dict methods that raise NameError or AttributeError
-# at runtime in Python 3.  Print statement is intentionally excluded here
-# because it is a SyntaxError caught by test_py3_syntax for .py files and
-# by test_pyx_no_print_statement for .pyx files.
+# at runtime in Python 3.  Print statement is a SyntaxError caught by
+# test_py3_syntax, so it is not repeated here.
 _RUNTIME_PATTERNS = [
-    (r"\bxrange\s*\(",      "xrange() was removed in Python 3; use range()"),
-    (r"\.has_key\s*\(",     ".has_key() was removed; use `in`"),
-    (r"\.iteritems\s*\(",   ".iteritems() was removed; use .items()"),
-    (r"\.itervalues\s*\(",  ".itervalues() was removed; use .values()"),
-    (r"\.iterkeys\s*\(",    ".iterkeys() was removed; use .keys()"),
-    (r"\braw_input\s*\(",   "raw_input() was removed; use input()"),
-    (r"\bbasestring\b",     "basestring does not exist in Python 3"),
-    (r"\blong\s*\(",        "long() was removed; use int()"),
+    (r"\bxrange\s*\(",     "xrange() was removed in Python 3; use range()"),
+    (r"\.has_key\s*\(",    ".has_key() was removed; use `in`"),
+    (r"\.iteritems\s*\(",  ".iteritems() was removed; use .items()"),
+    (r"\.itervalues\s*\(", ".itervalues() was removed; use .values()"),
+    (r"\.iterkeys\s*\(",   ".iterkeys() was removed; use .keys()"),
+    (r"\braw_input\s*\(",  "raw_input() was removed; use input()"),
+    (r"\bbasestring\b",    "basestring does not exist in Python 3"),
+    (r"\blong\s*\(",       "long() was removed; use int()"),
 ]
 
 
@@ -78,7 +72,7 @@ def test_py3_syntax(py_file):
 
 @pytest.mark.parametrize(
     "src_file",
-    _SOURCE_PY_FILES + _SOURCE_PYX_FILES,
+    _SOURCE_PY_FILES,
     ids=lambda p: str(p.relative_to(ROOT)),
 )
 def test_no_python2_builtins(src_file):
@@ -91,18 +85,4 @@ def test_no_python2_builtins(src_file):
     if violations:
         pytest.fail(
             f"{src_file.relative_to(ROOT)}:\n" + "\n".join(violations)
-        )
-
-
-@pytest.mark.parametrize("pyx_file", _SOURCE_PYX_FILES, ids=lambda p: str(p.relative_to(ROOT)))
-def test_pyx_no_print_statement(pyx_file):
-    """Cython source files must use print() calls, not print statements.
-
-    py_compile cannot parse .pyx files, so this regex check fills the gap.
-    Matches ``print expr`` but not ``print(`` or ``# print``.
-    """
-    violations = _scan(pyx_file, [(r"\bprint\s+[^(=\n]", "bare print statement is a SyntaxError in Python 3")])
-    if violations:
-        pytest.fail(
-            f"{pyx_file.relative_to(ROOT)}:\n" + "\n".join(violations)
         )

@@ -1,8 +1,7 @@
-"""Tests for the compiled Cython module get_stat_probs."""
+"""Tests for the get_stat_probs module."""
 import math
 import numpy as np
 import pytest
-from scipy.stats import kendalltau as scipy_kt
 
 from get_stat_probs import (
     kt,
@@ -25,12 +24,11 @@ class TestKendallTau:
         tau, _ = kt([1, 2, 3, 4, 5], [5, 4, 3, 2, 1])
         assert tau == pytest.approx(-1.0)
 
-    def test_matches_scipy(self):
+    def test_known_value(self):
         x = [1, 3, 2, 5, 4, 6, 8, 7]
         y = [2, 1, 4, 3, 5, 7, 6, 8]
         tau, _ = kt(x, y)
-        scipy_tau, _ = scipy_kt(x, y)
-        assert tau == pytest.approx(scipy_tau, abs=1e-5)
+        assert tau == pytest.approx(4 / 7, abs=1e-5)  # 4/7 ≈ 0.5714
 
     def test_returns_two_values(self):
         result = kt([1, 2, 3], [1, 2, 3])
@@ -47,28 +45,25 @@ class TestKendallTau:
         assert abs(np.mean(taus)) < 0.3
 
     def test_with_x_ties(self):
-        """Tied x values exercise the u-counting loop (was xrange in root pyx)."""
+        """Tau-b with ties in x only: tau < 1 even for monotone y."""
         x = [1, 1, 2, 2, 3, 3]
         y = [1, 2, 3, 4, 5, 6]
         tau, _ = kt(x, y)
-        expected, _ = scipy_kt(x, y)
-        assert tau == pytest.approx(expected, abs=1e-5)
+        assert tau == pytest.approx(0.8944271910, abs=1e-5)
 
     def test_with_y_ties(self):
-        """Tied y values exercise the v-counting loop after mergesort."""
+        """Tau-b with ties in y only: symmetric result to x-ties case."""
         x = [1, 2, 3, 4, 5, 6]
         y = [1, 1, 2, 2, 3, 3]
         tau, _ = kt(x, y)
-        expected, _ = scipy_kt(x, y)
-        assert tau == pytest.approx(expected, abs=1e-5)
+        assert tau == pytest.approx(0.8944271910, abs=1e-5)
 
     def test_with_joint_ties(self):
-        """Same (x, y) pair repeated exercises the t-counting loop."""
+        """Tau-b with joint (x, y) ties: concordance reduced by tied pairs."""
         x = [1, 1, 2, 3, 4]
         y = [1, 1, 3, 2, 4]
         tau, _ = kt(x, y)
-        expected, _ = scipy_kt(x, y)
-        assert tau == pytest.approx(expected, abs=1e-5)
+        assert tau == pytest.approx(7 / 9, abs=1e-5)  # 7/9 ≈ 0.7778
 
     def test_all_tied_returns_nan(self):
         """Completely constant arrays → tot == u == v → (nan, nan)."""
