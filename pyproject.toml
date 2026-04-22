@@ -28,6 +28,7 @@ packages = [{include = "bootjtk"}]
 include = [
     "bootjtk/ref_files/**/*",
     "bootjtk/*.R",
+    "CHANGELOG.md",
 ]
 
 [tool.poetry.scripts]
