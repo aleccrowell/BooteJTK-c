@@ -46,7 +46,7 @@ def get_stat_probs(dorder,new_header,triples,dref,int size):
     rs = []
     for kkey in dorder:
         lamb_get_matches = lambda triple: get_matches(kkey,triple,dref,new_header)
-        res = np.array(map(lamb_get_matches,triples))
+        res = np.array([lamb_get_matches(triple) for triple in triples])
         r = pick_best_match(res)
         #r = list(r)
           
@@ -62,7 +62,7 @@ def get_stat_probs(dorder,new_header,triples,dref,int size):
         d_nagene.setdefault(r[4],0)
         d_nagene[r[4]]+=dorder[kkey]
 
-        for _ in xrange(int(np.round(size*dorder[kkey]))):
+        for _ in range(int(np.round(size*dorder[kkey]))):
             rs.append(r)
     rs = np.array(rs)
     #print rs
@@ -351,7 +351,7 @@ def kt(x, y, initial_lexsort=True):
     # compute joint ties
     first = 0
     t = 0
-    for i in xrange(1, n):
+    for i in range(1, n):
         if x[perm[first]] != x[perm[i]] or y[perm[first]] != y[perm[i]]:
             t += ((i - first) * (i - first - 1)) // 2
             first = i
@@ -360,7 +360,7 @@ def kt(x, y, initial_lexsort=True):
     # compute ties in x
     first = 0
     u = 0
-    for i in xrange(1,n):
+    for i in range(1,n):
         if x[perm[first]] != x[perm[i]]:
             u += ((i - first) * (i - first - 1)) // 2
             first = i
@@ -371,7 +371,7 @@ def kt(x, y, initial_lexsort=True):
     # compute ties in y after mergesort with counting
     first = 0
     v = 0
-    for i in xrange(1,n):
+    for i in range(1,n):
         if y[perm[first]] != y[perm[i]]:
             v += ((i - first) * (i - first - 1)) // 2
             first = i

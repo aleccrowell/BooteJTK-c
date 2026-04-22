@@ -46,7 +46,7 @@ def get_stat_probs(dorder,new_header,periods,phases,widths,int size):
         d_nagene.setdefault(r[4],0)
         d_nagene[r[4]]+=dorder[kkey]
 
-        for _ in xrange(int(np.round(size*dorder[kkey]))):
+        for _ in range(int(np.round(size*dorder[kkey]))):
             rs.append(r)
     rs = np.array(rs)
     #print rs
@@ -139,5 +139,5 @@ def pick_best_match(res):
         return res[ind]
 
     ### If we've gotten down here everything has failed
-    print 'Ties remain...',res
+    print('Ties remain...', res)
     return res[np.random.randint(len(res))]

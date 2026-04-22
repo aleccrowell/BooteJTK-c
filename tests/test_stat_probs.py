@@ -8,6 +8,7 @@ from get_stat_probs import (
     kt,
     generate_base_reference,
     get_matches,
+    get_stat_probs,
     get_waveform_list,
     make_references,
     farctanh,
@@ -44,6 +45,36 @@ class TestKendallTau:
         rng = np.random.default_rng(42)
         taus = [kt(list(range(20)), list(rng.permutation(20)))[0] for _ in range(50)]
         assert abs(np.mean(taus)) < 0.3
+
+    def test_with_x_ties(self):
+        """Tied x values exercise the u-counting loop (was xrange in root pyx)."""
+        x = [1, 1, 2, 2, 3, 3]
+        y = [1, 2, 3, 4, 5, 6]
+        tau, _ = kt(x, y)
+        expected, _ = scipy_kt(x, y)
+        assert tau == pytest.approx(expected, abs=1e-5)
+
+    def test_with_y_ties(self):
+        """Tied y values exercise the v-counting loop after mergesort."""
+        x = [1, 2, 3, 4, 5, 6]
+        y = [1, 1, 2, 2, 3, 3]
+        tau, _ = kt(x, y)
+        expected, _ = scipy_kt(x, y)
+        assert tau == pytest.approx(expected, abs=1e-5)
+
+    def test_with_joint_ties(self):
+        """Same (x, y) pair repeated exercises the t-counting loop."""
+        x = [1, 1, 2, 3, 4]
+        y = [1, 1, 3, 2, 4]
+        tau, _ = kt(x, y)
+        expected, _ = scipy_kt(x, y)
+        assert tau == pytest.approx(expected, abs=1e-5)
+
+    def test_all_tied_returns_nan(self):
+        """Completely constant arrays → tot == u == v → (nan, nan)."""
+        tau, p = kt([2, 2, 2, 2], [2, 2, 2, 2])
+        assert np.isnan(tau)
+        assert np.isnan(p)
 
 
 class TestGenerateBaseReference:
@@ -210,3 +241,66 @@ class TestGetMatches:
         kkey = tuple(sorted(range(len(self.HEADER))))
         result = get_matches(kkey, self.triple, self.dref, list(self.new_header))
         assert math.isfinite(result[1])
+
+
+class TestGetStatProbs:
+    """Tests for get_stat_probs(), the main aggregation function.
+
+    This function contains the ``for _ in range(int(...))`` accumulation
+    loop that was ``xrange(...)`` in the un-migrated root .pyx source.
+    Exercising it here would raise NameError on the unfixed code if tests
+    were run against that compiled version.
+    """
+
+    HEADER = list(range(0, 24, 2))
+    PHASES = np.array(list(range(0, 24, 2)), dtype=float)
+    WIDTHS = np.array(list(range(2, 24, 2)), dtype=float)
+    PERIODS = np.array([24.0])
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        triples = get_waveform_list(self.PERIODS, self.PHASES, self.WIDTHS)
+        self.triples = triples
+        self.dref = make_references(self.HEADER, triples)
+        self.kkey = tuple(range(len(self.HEADER)))
+        self.dorder = {self.kkey: 1.0}
+
+    def test_return_structure(self):
+        out1, out2, d_tau, d_per, d_ph, d_na = get_stat_probs(
+            self.dorder, self.HEADER, self.triples, self.dref, 10
+        )
+        assert len(out1) == 6   # [m_per, s_per, m_ph, s_ph, m_na, s_na]
+        assert len(out2) == 2   # [m_tau, s_tau]
+
+    def test_mean_tau_finite(self):
+        _, out2, *_ = get_stat_probs(
+            self.dorder, self.HEADER, self.triples, self.dref, 10
+        )
+        m_tau, s_tau = out2
+        assert math.isfinite(m_tau)
+        assert math.isfinite(s_tau)
+
+    def test_distribution_dicts_nonempty(self):
+        _, _, d_tau, d_per, d_ph, d_na = get_stat_probs(
+            self.dorder, self.HEADER, self.triples, self.dref, 10
+        )
+        assert len(d_tau) > 0
+        assert len(d_per) > 0
+        assert len(d_ph) > 0
+        assert len(d_na) > 0
+
+    def test_multiple_rank_orders_exercises_accumulation_loop(self):
+        """Two entries in dorder forces the range() accumulation loop to run twice."""
+        kkey2 = tuple(reversed(range(len(self.HEADER))))
+        dorder = {self.kkey: 0.6, kkey2: 0.4}
+        out1, out2, *_ = get_stat_probs(
+            dorder, self.HEADER, self.triples, self.dref, 20
+        )
+        assert len(out1) == 6
+        assert len(out2) == 2
+
+    def test_distribution_probs_sum_to_one(self):
+        out1, out2, d_tau, *_ = get_stat_probs(
+            self.dorder, self.HEADER, self.triples, self.dref, 50
+        )
+        assert sum(d_tau.values()) == pytest.approx(1.0, abs=1e-6)
