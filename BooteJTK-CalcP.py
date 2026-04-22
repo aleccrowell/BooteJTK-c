@@ -93,7 +93,7 @@ def main(args):
         except ValueError:
             df = pd.read_table(fn,index_col='#')
         except ValueError:
-            print 'Header needs to begin with "ID" or with "#"'
+            print('Header needs to begin with "ID" or with "#"')
 
         j = pd.read_table(args.jtk,index_col='ID')
         mean = df.loc[j[j.GammaP>0.8].index].std(axis=1).dropna().mean()
