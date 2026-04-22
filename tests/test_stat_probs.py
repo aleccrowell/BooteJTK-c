@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from get_stat_probs import (
+from bootjtk.get_stat_probs import (
     kt,
     generate_base_reference,
     get_matches,

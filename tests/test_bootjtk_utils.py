@@ -6,7 +6,7 @@ import tempfile
 import numpy as np
 import pytest
 
-import BooteJTK as B
+import bootjtk.BooteJTK as B
 
 
 class TestIsNumber:
@@ -288,7 +288,7 @@ class TestProcessGene:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        from get_stat_probs import get_waveform_list, make_references
+        from bootjtk.get_stat_probs import get_waveform_list, make_references
         header, data = B.read_in(self.EXAMPLE)
         self.header = header
         d_data, new_header = B.get_data2(header, data[:1], 24.0)
