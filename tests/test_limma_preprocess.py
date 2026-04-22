@@ -9,7 +9,6 @@ from bootjtk.limma_preprocess import (
     deduplicate_timepoints,
     deduplicate_rownames,
     prepare_timeseries,
-    write_preprocessed,
     write_limma_outputs,
 )
 
@@ -223,33 +222,6 @@ class TestPrepareTimeseries:
         assert list(unique_times) == list(range(0, 24, 2))
         assert len(df.columns) == 24   # ZT0..ZT46 → 24 unique deduplicated cols
         assert len(df) > 0
-
-
-# ---------------------------------------------------------------------------
-# write_preprocessed + round-trip
-# ---------------------------------------------------------------------------
-
-class TestWritePreprocessed:
-    def test_file_is_readable_by_read_timeseries(self, tmp_path):
-        df = pd.DataFrame(
-            {'0.0': [1.0, 2.0], '2.0': [3.0, 4.0]},
-            index=pd.Index(['gene1', 'gene2'], name='ID')
-        )
-        fn = str(tmp_path / 'clean.tsv')
-        write_preprocessed(df, fn)
-        df2, raw_cols = read_timeseries(fn)
-        assert list(df2.index) == list(df.index)
-        assert len(raw_cols) == 2
-
-    def test_na_round_trips(self, tmp_path):
-        df = pd.DataFrame(
-            {'0.0': [1.0, float('nan')], '2.0': [3.0, 4.0]},
-            index=pd.Index(['g1', 'g2'], name='ID')
-        )
-        fn = str(tmp_path / 'clean.tsv')
-        write_preprocessed(df, fn)
-        df2, _ = read_timeseries(fn)
-        assert np.isnan(df2.iloc[1, 0])
 
 
 # ---------------------------------------------------------------------------

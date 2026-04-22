@@ -118,15 +118,6 @@ def prepare_timeseries(fn, period):
     return df, unique_times
 
 
-def write_preprocessed(df, fn_out):
-    """Write a preprocessed DataFrame to a TSV file for the R statistical core.
-
-    Column names are numeric floats. The index is labelled 'ID' so that the
-    simplified R scripts can locate it with standard read.csv logic.
-    """
-    df.to_csv(fn_out, sep='\t', na_rep='NA', index=True, index_label='ID')
-
-
 def write_limma_outputs(long_df, prefix, suffix):
     """Write wide-format output files from long-format limma/vash results.
 
