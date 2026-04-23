@@ -10,6 +10,7 @@ from bootjtk.get_stat_probs import (
     get_stat_probs,
     get_waveform_list,
     make_references,
+    rank_references,
     farctanh,
     periodic,
 )
@@ -257,19 +258,20 @@ class TestGetStatProbs:
         triples = get_waveform_list(self.PERIODS, self.PHASES, self.WIDTHS)
         self.triples = triples
         self.dref = make_references(self.HEADER, triples)
+        self.ref_ranks = rank_references(self.dref, triples)
         self.kkey = tuple(range(len(self.HEADER)))
         self.dorder = {self.kkey: 1.0}
 
     def test_return_structure(self):
         out1, out2, d_tau, d_per, d_ph, d_na = get_stat_probs(
-            self.dorder, self.HEADER, self.triples, self.dref, 10
+            self.dorder, self.HEADER, self.triples, self.dref, self.ref_ranks, 10
         )
         assert len(out1) == 6   # [m_per, s_per, m_ph, s_ph, m_na, s_na]
         assert len(out2) == 2   # [m_tau, s_tau]
 
     def test_mean_tau_finite(self):
         _, out2, *_ = get_stat_probs(
-            self.dorder, self.HEADER, self.triples, self.dref, 10
+            self.dorder, self.HEADER, self.triples, self.dref, self.ref_ranks, 10
         )
         m_tau, s_tau = out2
         assert math.isfinite(m_tau)
@@ -277,7 +279,7 @@ class TestGetStatProbs:
 
     def test_distribution_dicts_nonempty(self):
         _, _, d_tau, d_per, d_ph, d_na = get_stat_probs(
-            self.dorder, self.HEADER, self.triples, self.dref, 10
+            self.dorder, self.HEADER, self.triples, self.dref, self.ref_ranks, 10
         )
         assert len(d_tau) > 0
         assert len(d_per) > 0
@@ -289,13 +291,13 @@ class TestGetStatProbs:
         kkey2 = tuple(reversed(range(len(self.HEADER))))
         dorder = {self.kkey: 0.6, kkey2: 0.4}
         out1, out2, *_ = get_stat_probs(
-            dorder, self.HEADER, self.triples, self.dref, 20
+            dorder, self.HEADER, self.triples, self.dref, self.ref_ranks, 20
         )
         assert len(out1) == 6
         assert len(out2) == 2
 
     def test_distribution_probs_sum_to_one(self):
         out1, out2, d_tau, *_ = get_stat_probs(
-            self.dorder, self.HEADER, self.triples, self.dref, 50
+            self.dorder, self.HEADER, self.triples, self.dref, self.ref_ranks, 50
         )
         assert sum(d_tau.values()) == pytest.approx(1.0, abs=1e-6)

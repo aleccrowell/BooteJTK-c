@@ -288,7 +288,7 @@ class TestProcessGene:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        from bootjtk.get_stat_probs import get_waveform_list, make_references
+        from bootjtk.get_stat_probs import get_waveform_list, make_references, rank_references
         header, data = B.read_in(self.EXAMPLE)
         self.header = header
         d_data, new_header = B.get_data2(header, data[:1], 24.0)
@@ -300,7 +300,8 @@ class TestProcessGene:
         periods = np.array([24.0])
         triples = get_waveform_list(periods, phases, widths)
         dref = make_references(new_header, triples)
-        B._init_worker(triples, dref, new_header)
+        ref_ranks = rank_references(dref, triples)
+        B._init_worker(triples, dref, new_header, ref_ranks)
 
     def test_returns_tuple_with_gene_id(self):
         args = (self.gene_id, self.d_data_item, None, None, 10, 'DEFAULT', 'cosine')
