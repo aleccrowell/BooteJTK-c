@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bootjtk"
-version = "1.1.0"
+version = "1.2.0"
 description = "Bootstrap JTK analysis for circadian rhythm detection"
 authors = [
     "Alan L. Hutchison <alanlhutchison@uchicago.edu>",

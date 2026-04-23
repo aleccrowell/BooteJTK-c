@@ -4,7 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [1.2.0] — 2026-04-22
+## [1.2.0] — 2026-04-23
+
+### Performance
+- Replaced 132 sequential `scipy.kendalltau` calls per bootstrap rank order with a single
+  batched tau-b computation against all reference waveforms at once. At genome scale this
+  eliminates ~72 million Python function calls per run.
+- Added optional numba JIT path (`pip install bootjtk[fast]`): installs `numba` and
+  compiles the inner pair-counting loop to native code via `@numba.njit`.
+- Vectorized numpy fallback (`_batch_tau_numpy`) is active by default when numba is not
+  installed, using `np.einsum` to evaluate all 132 correlations in one array operation.
+- `rank_references()` pre-ranks all reference waveforms once at startup into a `(N, T)`
+  int64 array shared across pool workers, replacing per-gene dict lookups in the hot path.
+- `dict_order_probs`: single `np.random.normal(ms, sds, size=(size, T))` call replaces a
+  Python loop over timepoints; `rankdata(s3, axis=1)` replaces a loop over bootstrap
+  samples.
+- `eBayes`: vectorized per-gene posterior SD list comprehension to a numpy expression.
+- Dropped unused p-value computation from the hot path (was computed by `kendalltau` but
+  never used in any return value).
+- Minimum scipy version raised to 1.7.0 to match the `rankdata(axis=1)` call.
 
 ### Changed
 - Header parsers (`get_data`, `get_data2`, `get_data_multi`, `parse_timepoint_label`) now
