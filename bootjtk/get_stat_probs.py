@@ -1,14 +1,103 @@
 from scipy.stats import kendalltau as kt
 from scipy.stats import circmean as sscircmean
 from scipy.stats import circstd as sscircstd
+from scipy.stats import rankdata as _rankdata
 import numpy as np
 
+try:
+    import numba as _numba
+    _NUMBA = True
+except ImportError:
+    _NUMBA = False
 
-def get_stat_probs(dorder, new_header, triples, dref, size):
+if _NUMBA:
+    @_numba.njit(cache=True)
+    def _batch_tau_nb(kkey_arr, ref_ranks):
+        """Tau-b of kkey_arr (T,) against every row of ref_ranks (N, T) → (N,)."""
+        N = ref_ranks.shape[0]
+        T = ref_ranks.shape[1]
+        nx = 0
+        for j in range(T):
+            for k in range(j + 1, T):
+                if kkey_arr[j] != kkey_arr[k]:
+                    nx += 1
+        taus = np.empty(N, dtype=np.float64)
+        for i in range(N):
+            c = 0
+            d = 0
+            ny_i = 0
+            for j in range(T):
+                for k in range(j + 1, T):
+                    dy = ref_ranks[i, j] - ref_ranks[i, k]
+                    if dy != 0:
+                        ny_i += 1
+                    dx = kkey_arr[j] - kkey_arr[k]
+                    if dx != 0 and dy != 0:
+                        if (dx > 0) == (dy > 0):
+                            c += 1
+                        else:
+                            d += 1
+            denom = nx * ny_i
+            taus[i] = (c - d) / (denom ** 0.5) if denom > 0 else 0.0
+        return taus
+
+
+def _batch_tau_numpy(kkey_arr, ref_ranks):
+    """Vectorized tau-b fallback: kkey_arr (T,) vs ref_ranks (N, T) → (N,)."""
+    sx = np.sign(kkey_arr[:, None] - kkey_arr[None, :])              # (T, T)
+    sy = np.sign(ref_ranks[:, :, None] - ref_ranks[:, None, :])       # (N, T, T)
+    num = np.einsum('ij,nij->n', sx, sy) / 2.0                        # (N,)
+    nx = float(np.count_nonzero(sx)) / 2.0
+    ny = np.count_nonzero(sy.reshape(len(ref_ranks), -1), axis=1).astype(float) / 2.0
+    denom = np.sqrt(nx * ny)
+    return np.where(denom > 0.0, num / denom, 0.0)
+
+
+def rank_references(dref, triples):
+    """Pre-rank all reference waveforms as integer arrays for batch tau."""
+    N = len(triples)
+    T = len(next(iter(dref.values())))
+    ref_ranks = np.empty((N, T), dtype=np.int64)
+    for i, triple in enumerate(triples):
+        key = (float(triple[0]), float(triple[1]), float(triple[2]))
+        ref_ranks[i] = _rankdata(dref[key]).astype(np.int64)
+    return ref_ranks
+
+
+def get_stat_probs(dorder, new_header, triples, dref, ref_ranks, size):
+    new_header_arr = np.array(new_header, dtype=float)
+    periods = triples[:, 0]
+    phases = triples[:, 1]
+    widths = triples[:, 2]
+    nadirs = (phases + widths) % periods
+
+    _batch_tau = _batch_tau_nb if _NUMBA else _batch_tau_numpy
+
     d_taugene, d_pergene, d_phgene, d_nagene = {}, {}, {}, {}
     rs = []
     for kkey in dorder:
-        res = np.array([get_matches(kkey, triple, dref, new_header) for triple in triples])
+        kkey_arr = np.array(kkey, dtype=np.int64)
+        maxloc = new_header_arr[np.argmax(kkey_arr)]
+        minloc = new_header_arr[np.argmin(kkey_arr)]
+
+        raw_taus = _batch_tau(kkey_arr, ref_ranks)
+        taus = np.arctanh(np.clip(raw_taus, -0.99, 0.99))
+        abs_taus = np.abs(taus)
+
+        neg_mask = taus < 0
+        phase_col = np.where(neg_mask, nadirs, phases)
+        nadir_col = np.where(neg_mask, phases, nadirs)
+
+        res = np.column_stack([
+            abs_taus,
+            np.zeros(len(triples)),
+            periods,
+            phase_col,
+            nadir_col,
+            np.full(len(triples), maxloc),
+            np.full(len(triples), minloc),
+        ])
+
         r = pick_best_match(res)
         d_taugene[r[0]] = d_taugene.get(r[0], 0) + dorder[kkey]
         d_pergene[r[2]] = d_pergene.get(r[2], 0) + dorder[kkey]

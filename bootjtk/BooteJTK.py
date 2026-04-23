@@ -38,6 +38,7 @@ import os.path
 from .get_stat_probs import get_stat_probs as gsp_get_stat_probs
 from .get_stat_probs import get_waveform_list as gsp_get_waveform_list
 from .get_stat_probs import make_references as gsp_make_references
+from .get_stat_probs import rank_references as gsp_rank_references
 from .get_stat_probs import kt
 
 _REF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ref_files')
@@ -47,10 +48,11 @@ _REF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ref_files')
 _g_triples = None
 _g_dref = None
 _g_new_header = None
+_g_ref_ranks = None
 
-def _init_worker(triples, dref, new_header):
-    global _g_triples, _g_dref, _g_new_header
-    _g_triples, _g_dref, _g_new_header = triples, dref, new_header
+def _init_worker(triples, dref, new_header, ref_ranks):
+    global _g_triples, _g_dref, _g_new_header, _g_ref_ranks
+    _g_triples, _g_dref, _g_new_header, _g_ref_ranks = triples, dref, new_header, ref_ranks
 
 def _process_gene(args):
     geneID, d_data_item, serie_item, precomputed_dorder, size, fn, waveform = args
@@ -75,7 +77,7 @@ def _process_gene(args):
         gene_order_probs = d_op[geneID]
         gene_boots = d_b[geneID]
     out1, out2, d_taugene, d_pergene, d_phgene, d_nagene = gsp_get_stat_probs(
-        dorder, _g_new_header, _g_triples, _g_dref, size)
+        dorder, _g_new_header, _g_triples, _g_dref, _g_ref_ranks, size)
     out_line = [str(l) for l in [geneID, waveform] + out1 + s_stats + out2]
     return geneID, out_line, d_taugene, d_phgene, gene_order_probs, gene_boots
 
@@ -186,7 +188,8 @@ def main(args):
 
     triples = gsp_get_waveform_list(periods,phases,widths)
 
-    dref = gsp_make_references(new_header,triples,waveform)
+    dref = gsp_make_references(new_header, triples, waveform)
+    ref_ranks = gsp_rank_references(dref, triples)
     
     d_data_master1 = {}
     d_order_probs_master = {}
@@ -218,11 +221,11 @@ def main(args):
     print(f'Processing {len(gene_ids)} gene(s) with {actual_workers if n_workers != 1 else 1} worker(s)...')
     t0 = time.time()
     if n_workers == 1:
-        _init_worker(triples, dref, new_header)
+        _init_worker(triples, dref, new_header, ref_ranks)
         results = [_process_gene(a) for a in gene_args]
     else:
         with multiprocessing.Pool(pool_size, initializer=_init_worker,
-                                   initargs=(triples, dref, new_header)) as pool:
+                                   initargs=(triples, dref, new_header, ref_ranks)) as pool:
             results = pool.map(_process_gene, gene_args)
     print(f'Done in {time.time() - t0:.1f}s')
 
@@ -579,9 +582,10 @@ def eBayes(d_data,D_null={}):
     d0,s0=get_d0_s0(d_data,D_null)
     
     for key in d_data:
-        d_data[key][1]=[posterior_s(d0,s0,d_data[key][1][i],d_data[key][2][i]) for i in range(len(d_data[key][1]))]
-        d_data[key][2]=[1 for i in range(len(d_data[key][1]))]
-    #print d0,s0
+        s_arr = np.array(d_data[key][1], dtype=float)
+        d_arr = np.array(d_data[key][2], dtype=float)
+        d_data[key][1] = list(np.sqrt((d0 * s0**2 + d_arr * s_arr**2) / (d0 + d_arr)))
+        d_data[key][2] = [1] * len(s_arr)
     return d_data
 
 def get_order_prob(d_data,size):
@@ -610,23 +614,16 @@ def dict_of_orders(M,SDS,NS,size):
         d[key]=d[key]/SUM
     return d,s2
 
-def dict_order_probs(ms,sds,ns,size=100):
-    """ Check for SD problems """
+def dict_order_probs(ms, sds, ns, size=100):
     sds = [sd if is_number(sd) else np.nanmean(sds) for sd in sds]
+    ms_arr = np.array(ms, dtype=float)
+    sds_arr = np.array(sds, dtype=float)
+    s3 = np.random.normal(ms_arr, sds_arr, size=(size, len(ms_arr)))
     d = {}
-    """ Create array for bootstraps of time series """
-    s3 = np.zeros((size,len(sds)))
-    """ Fill array time point by time point """
-    #print ms,sds
-    for i in range(len(sds)):
-        s3[:,i] = np.random.normal(ms[i],sds[i],size=size)
-
-    """ Turn into ranks for storage """
-    for s in s3:
-        r=tuple(map(int,rankdata(s)))
-        d.setdefault(r,0)
-        d[r] += 1./size
-    return d,s3
+    for r in rankdata(s3, axis=1):
+        key = tuple(map(int, r))
+        d[key] = d.get(key, 0) + 1.0 / size
+    return d, s3
 
 
 def __create_parser__():

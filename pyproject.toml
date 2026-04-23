@@ -37,11 +37,15 @@ bootejtk-calcp = "bootjtk.pipeline:cli"
 [tool.poetry.dependencies]
 python = ">=3.8"
 numpy = ">=1.11.0"
-scipy = ">=0.15.1"
+scipy = ">=1.7.0"
 pandas = ">=1.0.0"
 matplotlib = ">=2.0.0"
 statsmodels = ">=0.6.1"
 setuptools = {version = ">=42", python = ">=3.9"}
+numba = {version = ">=0.50.0", optional = true}
+
+[tool.poetry.extras]
+fast = ["numba"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
