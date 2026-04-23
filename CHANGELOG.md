@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] — 2026-04-22
+
+### Changed
+- Header parsers (`get_data`, `get_data2`, `get_data_multi`, `parse_timepoint_label`) now
+  strip a `_{rep}` replicate suffix before converting the numeric portion, so columns in
+  the shared `ZT{HH}_{rep}` format (e.g. `ZT02_1`, `ZT02_2`) are parsed correctly. The
+  legacy `ZTn` / `CTn` formats remain fully supported.
+
 ## [1.1.0] — 2026-04-22
 
 ### Added

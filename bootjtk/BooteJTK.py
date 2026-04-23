@@ -422,7 +422,7 @@ def generate_mod_series(reference,series):
 
 def get_data(header,data,period):
     """This function does not use the header information to set the number of replicates """
-    new_h = [float(h[2:])%period if 'ZT' in h or 'CT' in h else float(h)%period for h in header]
+    new_h = [float(h[2:].split('_')[0])%period if 'ZT' in h or 'CT' in h else float(h.split('_')[0])%period for h in header]
     #print new_h
     length = len(new_h)
     seen = []
@@ -456,7 +456,7 @@ def get_data(header,data,period):
 
 def get_data2(header,data,period):
     """ This function uses the header information to set the number of replicates"""
-    new_h = [float(h[2:])%period if 'ZT' in h or 'CT' in h else float(h)%period for h in header]
+    new_h = [float(h[2:].split('_')[0])%period if 'ZT' in h or 'CT' in h else float(h.split('_')[0])%period for h in header]
     length = len(new_h)
     seen = []
     dref = {}
@@ -489,8 +489,8 @@ def get_data2(header,data,period):
 
 def get_data_multi(header,header2,data,sds,ns,period):
     """ This function takes in several pre-eBayes files to create the d_data dictionary"""
-    new_h = [float(h[2:])%period if 'ZT' in h or 'CT' in h else float(h)%period for h in header]
-    h2 = [float(h[2:])%period if 'ZT' in h or 'CT' in h else float(h)%period for h in header2]    
+    new_h = [float(h[2:].split('_')[0])%period if 'ZT' in h or 'CT' in h else float(h.split('_')[0])%period for h in header]
+    h2 = [float(h[2:].split('_')[0])%period if 'ZT' in h or 'CT' in h else float(h.split('_')[0])%period for h in header2]    
     length = len(new_h)
     seen = []
     dref = {}

@@ -109,15 +109,19 @@ bootejtk-calcp -f example/TestInput4.txt -r 2 -z 50 -j 8
 
 ## Input format
 
-Tab-delimited text file. The header row must start with `#` or `ID`; subsequent columns are zeitgeber time labels (`ZT0`, `ZT2`, …). Each data row begins with a gene/feature identifier.
+Tab-delimited text file. The header row must start with `#` or `ID`; subsequent columns are zeitgeber time labels. Each data row begins with a gene/feature identifier.
+
+The preferred header format encodes both the timepoint and replicate number:
 
 ```
-#	ZT0	ZT2	ZT4	ZT6	...
-gene1	1.23	2.45	3.10	2.88	...
-gene2	5.01	4.87	3.92	4.10	...
+#	ZT00_1	ZT00_2	ZT02_1	ZT02_2	ZT04_1	ZT04_2	...
+gene1	1.23	1.31	2.45	2.38	3.10	3.05	...
+gene2	5.01	4.95	4.87	4.91	3.92	4.01	...
 ```
 
-Time labels can use decimal values (e.g. `ZT14.7`) and do not need to be evenly spaced.
+Column labels follow the pattern `ZT{HH}_{rep}` where `HH` is the zero-padded hour (e.g. `00`, `02`, `04`) and `rep` is the replicate number. This format is shared with [LIMBR](https://github.com/aleccrowell/LIMBR) and [PIRS](https://github.com/aleccrowell/PIRS), so output from those tools can be passed directly to BooteJTK without reformatting.
+
+The legacy formats `ZT0`, `ZT2`, `CT0`, `CT2` (no replicate suffix) remain fully supported for backwards compatibility, as do decimal values (e.g. `ZT14.7`). Time labels do not need to be evenly spaced.
 
 
 ## Output files
