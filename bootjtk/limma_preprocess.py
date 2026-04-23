@@ -43,6 +43,7 @@ def parse_timepoint_label(label):
     label = re.sub(r'^X', '', str(label).strip())
     label = re.sub(r'^ZT', '', label)
     label = re.sub(r'^CT', '', label)
+    label = label.split('_')[0]
     return float(label)
 
 
