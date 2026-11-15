@@ -10,7 +10,7 @@ Based on [BooteJTK](https://github.com/alanlhutchison/BooteJTK) by Alan Hutchiso
 
 **References**
 
-- Hutchison AL _et al._ (2016), "BooteJTK: Improved Rhythm Detection via Bootstrapping", bioRxiv.
+- Hutchison AL, Allada R, Dinner AR. "Bootstrapping and Empirical Bayes Methods Improve Rhythm Detection in Sparsely Sampled Data." _Journal of Biological Rhythms_ 2018 33(4): 339–349. [doi:10.1177/0748730418789536](https://doi.org/10.1177/0748730418789536)
 - Hutchison AL, Maienschein-Cline M, Chiang AH _et al._ "Improved statistical methods enable greater sensitivity in rhythm detection for genome-wide data." _PLoS Computational Biology_ 2015 11(3): e1004094. [doi:10.1371/journal.pcbi.1004094](http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004094)
 
 
